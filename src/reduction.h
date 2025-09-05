@@ -1,0 +1,9 @@
+#pragma once
+
+#include <stdbool.h>
+
+#include "commands.h"
+#include "parsing.h"
+
+bool lambda_is_normal(Lambda *lambda);
+Lambda *lambda_reduce(Lambda *lambda, Mode mode, unsigned iterations);
