@@ -54,7 +54,7 @@ Lambda *hashtable_insert(HashTable *table, Lambda *lambda)
         if (lambda->type != LAMBDA_BIND)
                 return NULL;
 
-        const char *insert_name = lambda->bind.name;
+        const char *insert_name = lambda->bind.shortcut;
         uint32_t hash = hash_function(insert_name);
         size_t index = hash % BUCKET_COUNT;
 
@@ -68,7 +68,7 @@ Lambda *hashtable_insert(HashTable *table, Lambda *lambda)
         Node *node = bucket;
 
         while (node != NULL) {
-                const char *node_name = node->value->bind.name;
+                const char *node_name = node->value->bind.shortcut;
                 if (strcmp(insert_name, node_name) == 0) {
                         lambda_free(node->value);
                         node->value = lambda;
@@ -105,7 +105,7 @@ Lambda *hashtable_search(HashTable *table, const char *key)
         if (node->value == NULL)
                 return NULL;
 
-        while (strcmp(node->value->bind.name, key) != 0) {
+        while (strcmp(node->value->bind.shortcut, key) != 0) {
                 node = node->next;
 
                 if (node == NULL)
@@ -130,7 +130,7 @@ Lambda *hashtable_delete(HashTable *table, const char *key)
 
         Node *prev = NULL;
 
-        while (strcmp(node->value->bind.name, key) != 0) {
+        while (strcmp(node->value->bind.shortcut, key) != 0) {
                 prev = node;
                 node = node->next;
 

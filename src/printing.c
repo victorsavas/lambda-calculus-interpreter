@@ -10,17 +10,34 @@ void lambda_print(Lambda *lambda)
 
         switch (lambda->type) {
         case LAMBDA_BIND:
-                printf("%s = ", lambda->bind.name);
+                printf("%s=", lambda->bind.shortcut);
                 lambda_print(lambda->bind.term);
                 break;
         
+        case LAMBDA_SHORTCUT:
+                printf("%s", lambda->shortcut);
+                break;
+        
         case LAMBDA_VARIABLE:
-                printf("%s", lambda->variable);
+                if (lambda->variable.subscript < 0)
+                        printf("%c", lambda->variable.letter);
+                else
+                        printf("%c%d",
+                                lambda->variable.letter,
+                                lambda->variable.subscript);
+
                 break;
 
         case LAMBDA_ABSTRACTION:
-                printf("λ%s.", lambda->abstraction.binding);
+                if (lambda->abstraction.binding.subscript < 0)
+                        printf("λ%c.", lambda->abstraction.binding.letter);
+                else
+                        printf("λ%c%d.",
+                                lambda->abstraction.binding.letter,
+                                lambda->abstraction.binding.subscript);
+                
                 lambda_print(lambda->abstraction.body);
+                
                 break;
 
         case LAMBDA_APPLICATION:
@@ -30,10 +47,6 @@ void lambda_print(Lambda *lambda)
                 bool left_parenthesis = left->type == LAMBDA_ABSTRACTION;
                 bool right_parenthesis = right->type != LAMBDA_VARIABLE;
 
-                bool parenthesis_space = 
-                        right->type == LAMBDA_VARIABLE
-                     || (left->type == LAMBDA_VARIABLE && !right_parenthesis);
-
                 if (left_parenthesis)
                         printf("(");
 
@@ -41,9 +54,6 @@ void lambda_print(Lambda *lambda)
 
                 if (left_parenthesis)
                         printf(")");
-
-                if (parenthesis_space)
-                        printf(" ");
 
                 if (right_parenthesis)
                         printf("(");

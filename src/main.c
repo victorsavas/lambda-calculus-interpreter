@@ -6,7 +6,7 @@
 #include "parsing.h"
 #include "hashtable.h"
 #include "printing.h"
-#include "free_variables.h"
+#include "shortcut.h"
 #include "reduction.h"
 #include "commands.h"
 
@@ -36,7 +36,7 @@ int main()
                 if (lambda == NULL)
                         continue;
 
-                bool valid_term = lambda_replace_free_variables(lambda, table);
+                bool valid_term = replace_shortcuts(lambda, table);
 
                 if (!valid_term) {
                         printf("Error. Undefined free variable.\n");
@@ -44,7 +44,7 @@ int main()
                         continue;
                 }
 
-                reduction_wrapper(lambda, mode, 1000);
+                reduction_wrapper(lambda, mode, 1000000);
 
                 printf(" -> ");
                 lambda_print(lambda);
@@ -61,7 +61,7 @@ int main()
 
 bool reduction_wrapper(Lambda *lambda, Mode mode, unsigned iterations)
 {
-        lambda_reduce(lambda, mode, 1000);
+        lambda_reduce(lambda, mode, iterations);
 }
 
 char *fgets_wrapper(char *buffer, size_t buf_len, FILE *file)

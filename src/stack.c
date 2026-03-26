@@ -1,20 +1,24 @@
 #include <string.h>
+
 #include "stack.h"
+#include "variable.h"
+
+#define STACK_CAP 16
 
 struct Stack {
-        char **array;
+        struct Variable *array;
         size_t top;
         size_t capacity;
 };
 
-Stack *stack_init(size_t capacity)
+Stack *stack_init()
 {
         Stack *stack = malloc(sizeof(*stack));
 
         if (stack == NULL)
                 return NULL;
 
-        stack->array = malloc(sizeof(*stack->array) * capacity);
+        stack->array = malloc(sizeof(*stack->array) * STACK_CAP);
 
         if (stack->array == NULL) {
                 free(stack);
@@ -22,7 +26,7 @@ Stack *stack_init(size_t capacity)
         }
 
         stack->top = 0;
-        stack->capacity = capacity;
+        stack->capacity = STACK_CAP;
 
         return stack;
 }
@@ -36,13 +40,13 @@ void stack_free(Stack *stack)
         free(stack);
 }
 
-size_t stack_push(Stack *stack, char *str)
+size_t stack_push(Stack *stack, struct Variable variable)
 {
-        if (stack == NULL || str == NULL)
+        if (stack == NULL)
                 return 0;
 
         if (stack->top + 1 == stack->capacity) {
-                char **array = realloc(stack->array, stack->capacity << 1);
+                struct Variable *array = realloc(stack->array, stack->capacity << 1);
 
                 if (array == NULL)
                         return 0;
@@ -51,44 +55,62 @@ size_t stack_push(Stack *stack, char *str)
                 stack->capacity <<= 1;
         }
 
-        stack->array[stack->top++] = str;
+        stack->array[stack->top++] = variable;
 
         return stack->top;
 }
 
-char *stack_pop(Stack *stack)
+struct Variable stack_pop(Stack *stack)
 {
+        struct Variable error = {
+                .letter = '\0',
+                .subscript = -1
+        };
+
         if (stack == NULL)
-                return NULL;
+                return error;
 
         if (stack->top == 0)
-                return NULL;
+                return error;
 
         return stack->array[--stack->top];
 }
 
-char *stack_peek(Stack *stack)
+struct Variable stack_peek(Stack *stack)
 {
+        struct Variable error = {
+                .letter = '\0',
+                .subscript = -1
+        };
+        
         if (stack == NULL)
-                return NULL;
+                return error;
 
         if (stack->top == 0)
-                return NULL;
+                return error;
 
         return stack->array[stack->top];
 }
 
-char *stack_search(Stack *stack, char *name)
+bool stack_empty(Stack *stack)
 {
-        if (stack == NULL || name == NULL)
-                return NULL;
+        if (stack == NULL)
+                return false;
+
+        return stack->top == 0;
+}
+
+bool stack_search(Stack *stack, struct Variable variable)
+{
+        if (stack == NULL)
+                return false;
 
         for (size_t i = stack->top; i-- > 0;) {
-                char *str = stack->array[i];
+                struct Variable var = stack->array[i];
 
-                if (strcmp(str, name) == 0)
-                        return str;
+                if (variable_compare(var, variable))
+                        return true;
         }
 
-        return NULL;
+        return false;
 }

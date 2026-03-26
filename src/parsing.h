@@ -1,7 +1,10 @@
 #pragma once
 
+#include "variable.h"
+
 typedef enum LambdaExprType {
         LAMBDA_BIND,
+        LAMBDA_SHORTCUT,
         LAMBDA_VARIABLE,
         LAMBDA_ABSTRACTION,
         LAMBDA_APPLICATION
@@ -14,14 +17,16 @@ struct Lambda {
 
         union {
                 struct {
-                        char *name;
+                        char *shortcut;
                         Lambda *term;
                 } bind;
 
-                char *variable;
+                char *shortcut;
+
+                struct Variable variable;
 
                 struct {
-                        char *binding;
+                        struct Variable binding;
                         Lambda *body;
                 } abstraction;
 

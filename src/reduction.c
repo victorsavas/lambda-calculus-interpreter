@@ -2,14 +2,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "alpha_equivalence.h"
+#include "alpha_rename.h"
 #include "duplicate.h"
 #include "printing.h"
 #include "reduction.h"
+#include "variable.h"
+#include "variable_capture.h"
 
 struct ReductionParam {
         Lambda *lambda;
-        char *binding;
+        struct Variable binding;
         Lambda *right;
 };
 
@@ -49,6 +51,7 @@ Lambda *lambda_reduce(Lambda *lambda, Mode mode, unsigned iterations)
                 else
                         application = get_call_by_name(lambda);
 
+                // Normal form reached
                 if (application == NULL)
                         break;
 
@@ -60,8 +63,14 @@ Lambda *lambda_reduce(Lambda *lambda, Mode mode, unsigned iterations)
                         printf("]\n");
                 }
 
-                if (!variable_capture_check(application))
+                // Tests for variable capture
+                Lambda *capture = variable_capture(application);
+
+                if (capture == NULL) {
                         beta_reduction(application);
+                }
+                else
+                        alpha_rename(capture, application);
         }
 
         return lambda;
@@ -81,7 +90,7 @@ void beta_reduction(Lambda *application)
         if (left->type != LAMBDA_ABSTRACTION)
                 return;
 
-        char *binding = left->abstraction.binding;
+        struct Variable binding = left->abstraction.binding;
         Lambda *body = left->abstraction.body;
 
         struct ReductionParam param = {
@@ -92,7 +101,6 @@ void beta_reduction(Lambda *application)
 
         beta_reduction_recursive(param);
 
-        free(binding);
         lambda_free(right);
 
         *application = *body;
@@ -102,10 +110,10 @@ void beta_reduction(Lambda *application)
 void beta_reduction_recursive(struct ReductionParam param)
 {
         Lambda *lambda = param.lambda;
-        char *binding = param.binding;
+        struct Variable binding = param.binding;
         Lambda *right = param.right;
 
-        if (lambda == NULL || binding == NULL || right == NULL)
+        if (lambda == NULL || right == NULL)
                 return;
 
         switch (lambda->type) {
@@ -126,20 +134,18 @@ void beta_reduction_recursive(struct ReductionParam param)
 void reduce_variable(struct ReductionParam param)
 {
         Lambda *lambda = param.lambda;
-        char *binding = param.binding;
+        struct Variable binding = param.binding;
         Lambda *right = param.right;
 
-        char *variable = lambda->variable;
+        struct Variable variable = lambda->variable;
                 
-        if (strcmp(variable, binding) != 0)
+        if (!variable_compare(variable, binding))
                 return;
 
         Lambda *duplicate = lambda_duplicate(right);
 
         if (duplicate == NULL)
                 return;
-
-        free(variable);
 
         *lambda = *duplicate;
 
@@ -149,11 +155,10 @@ void reduce_variable(struct ReductionParam param)
 void reduce_abstraction(struct ReductionParam param)
 {
         Lambda *lambda = param.lambda;
-        char *binding = param.binding;
+        struct Variable binding = param.binding;
+        struct Variable variable = lambda->abstraction.binding;
 
-        char *variable = lambda->abstraction.binding;
-
-        if (strcmp(variable, binding) == 0)
+        if (variable_compare(binding, variable))
                 return;
 
         struct ReductionParam body_param = {
@@ -168,7 +173,7 @@ void reduce_abstraction(struct ReductionParam param)
 void reduce_application(struct ReductionParam param)
 {
         Lambda *lambda = param.lambda;
-        char *binding = param.binding;
+        struct Variable binding = param.binding;
         Lambda *right = param.right;
 
         struct ReductionParam left_param = {
@@ -197,6 +202,7 @@ Lambda *get_call_by_name(Lambda *lambda)
         case LAMBDA_BIND:
                 return get_call_by_name(lambda->bind.term);
         
+        case LAMBDA_SHORTCUT:
         case LAMBDA_VARIABLE:
                 return NULL;
 
@@ -235,6 +241,7 @@ Lambda *get_call_by_value(Lambda *lambda)
         case LAMBDA_BIND:
                 return get_call_by_value(lambda->bind.term);
 
+        case LAMBDA_SHORTCUT:
         case LAMBDA_VARIABLE:
                 return NULL;
 

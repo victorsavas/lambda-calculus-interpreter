@@ -5,6 +5,7 @@
 
 static Lambda *duplicate_bind(Lambda *lambda);
 static Lambda *duplicate_variable(Lambda *lambda);
+static Lambda *duplicate_shortcut(Lambda *lambda);
 static Lambda *duplicate_abstraction(Lambda *lambda);
 static Lambda *duplicate_application(Lambda *lambda);
 
@@ -20,6 +21,9 @@ Lambda *lambda_duplicate(Lambda *lambda)
         case LAMBDA_VARIABLE:
                 return duplicate_variable(lambda);
 
+        case LAMBDA_SHORTCUT:
+                return duplicate_shortcut(lambda);
+
         case LAMBDA_ABSTRACTION:
                 return duplicate_abstraction(lambda);
 
@@ -32,15 +36,14 @@ Lambda *lambda_duplicate(Lambda *lambda)
 
 Lambda *duplicate_bind(Lambda *lambda)
 {
-        Lambda *duplicate;
-        duplicate = malloc(sizeof(*duplicate));
+        Lambda *duplicate = malloc(sizeof(*duplicate));
         
         if (duplicate == NULL)
                 return NULL;
 
-        char *name = my_strdup(lambda->bind.name);
+        char *shortcut = my_strdup(lambda->bind.shortcut);
 
-        if (name == NULL) {
+        if (shortcut == NULL) {
                 free(duplicate);
                 return NULL;
         }
@@ -49,12 +52,12 @@ Lambda *duplicate_bind(Lambda *lambda)
 
         if (term == NULL) {
                 free(duplicate);
-                free(name);
+                free(shortcut);
                 return NULL;
         }
 
         duplicate->type = LAMBDA_BIND;
-        duplicate->bind.name = name;
+        duplicate->bind.shortcut = shortcut;
         duplicate->bind.term = term;
 
         return duplicate;
@@ -62,50 +65,48 @@ Lambda *duplicate_bind(Lambda *lambda)
 
 Lambda *duplicate_variable(Lambda *lambda)
 {
-        Lambda *duplicate;
-        duplicate = malloc(sizeof(*duplicate));
+        Lambda *duplicate = malloc(sizeof(*duplicate));
 
         if (duplicate == NULL)
                 return NULL;
 
-        char *variable = my_strdup(lambda->variable);
-
-        if (variable == NULL) {
-                free(duplicate);
-                return NULL;
-        }
-
         duplicate->type = LAMBDA_VARIABLE;
-        duplicate->variable = variable;
+        duplicate->variable = lambda->variable;
+
+        return duplicate;
+}
+
+Lambda *duplicate_shortcut(Lambda *lambda)
+{
+        Lambda *duplicate = malloc(sizeof(*duplicate));
+
+        if (duplicate == NULL)
+                return NULL;
+
+        char *shortcut = my_strdup(lambda->shortcut);
+
+        duplicate->type = LAMBDA_SHORTCUT;
+        duplicate->shortcut = shortcut;
 
         return duplicate;
 }
 
 Lambda *duplicate_abstraction(Lambda *lambda)
 {
-        Lambda *duplicate;
-        duplicate = malloc(sizeof(*duplicate));
+        Lambda *duplicate = malloc(sizeof(*duplicate));
         
         if (duplicate == NULL)
                 return NULL;
-
-        char *binding = my_strdup(lambda->abstraction.binding);
-
-        if (binding == NULL) {
-                free(duplicate);
-                return NULL;
-        }
 
         Lambda *body = lambda_duplicate(lambda->abstraction.body);
 
         if (body == NULL) {
                 free(duplicate);
-                free(binding);
                 return NULL;
         }
 
         duplicate->type = LAMBDA_ABSTRACTION;
-        duplicate->abstraction.binding = binding;
+        duplicate->abstraction.binding = lambda->abstraction.binding;
         duplicate->abstraction.body = body;
 
         return duplicate;
@@ -113,8 +114,7 @@ Lambda *duplicate_abstraction(Lambda *lambda)
 
 Lambda *duplicate_application(Lambda *lambda)
 {
-        Lambda *duplicate;
-        duplicate = malloc(sizeof(*duplicate));
+        Lambda *duplicate = malloc(sizeof(*duplicate));
         
         if (duplicate == NULL)
                 return NULL;

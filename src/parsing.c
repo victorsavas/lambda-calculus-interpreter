@@ -8,7 +8,9 @@
 
 typedef enum TokenType {
         TOKEN_END,
+        TOKEN_SHORTCUT,
         TOKEN_VARIABLE,
+        TOKEN_NUMERAL,
         TOKEN_EQUALS,
         TOKEN_LEFT_PARENTHESIS,
         TOKEN_RIGHT_PARENTHESIS,
@@ -38,10 +40,13 @@ static Lambda *parse_expression(struct ParseParam param);
 static Lambda *parse_application(struct ParseParam param);
 static Lambda *parse_abstraction(struct ParseParam param);
 
-static Lambda *parse_variable(struct Token *token);
+static Lambda *parse_shortcut(struct Token *token);
+static struct Variable parse_variable(struct ParseParam param);
 static Lambda *parse_binding(Lambda *left, struct ParseParam param);
 static Lambda *parse_right_parenthesis(Lambda *lambda, bool parenthesis);
 static Lambda *parse_end(Lambda *lambda, bool parenthesis);
+
+static Lambda *generate_church_numeral(int integer);
 
 Lambda *lambda_parse(const char *str)
 {
@@ -74,16 +79,15 @@ void lambda_free(Lambda *lambda)
 
         switch (lambda->type) {
         case LAMBDA_BIND:
-                free(lambda->bind.name);
+                free(lambda->bind.shortcut);
                 lambda_free(lambda->bind.term);
                 break;
 
-        case LAMBDA_VARIABLE:
-                free(lambda->variable);
+        case LAMBDA_SHORTCUT:
+                free(lambda->shortcut);
                 break;
 
         case LAMBDA_ABSTRACTION:
-                free(lambda->abstraction.binding);
                 lambda_free(lambda->abstraction.body);
                 break;
 
@@ -101,7 +105,9 @@ Lambda *parse_expression(struct ParseParam param)
         get_token(param.token, param.str);
 
         switch (param.token->type) {
+        case TOKEN_NUMERAL:
         case TOKEN_VARIABLE:
+        case TOKEN_SHORTCUT:
         case TOKEN_LEFT_PARENTHESIS:
                 return parse_application(param);
 
@@ -136,8 +142,25 @@ Lambda *parse_application(struct ParseParam param)
                 case TOKEN_END:
                         return parse_end(left, param.parenthesis);
 
+                case TOKEN_NUMERAL:
+                        int integer = atoi(param.token->start);
+                        right = generate_church_numeral(integer);
+                        break;
+
+                case TOKEN_SHORTCUT:
+                        right = parse_shortcut(param.token);
+                        break;
+
                 case TOKEN_VARIABLE:
-                        right = parse_variable(param.token);
+                        struct Variable variable = parse_variable(param);
+                        
+                        right = malloc(sizeof(*right));
+
+                        if (right != NULL) {
+                                right->type = LAMBDA_VARIABLE;
+                                right->variable = variable;
+                        }
+
                         break;
         
                 case TOKEN_EQUALS:
@@ -209,12 +232,12 @@ Lambda *parse_abstraction(struct ParseParam param)
                 return NULL;
         }
 
-        Lambda *lambda = parse_variable(param.token);
+        struct Variable variable = parse_variable(param);
         
+        Lambda *lambda = malloc(sizeof(*lambda));
+
         if (lambda == NULL)
                 return NULL;
-
-        char *variable = lambda->variable;
 
         lambda->type = LAMBDA_ABSTRACTION;
         lambda->abstraction.binding = variable;
@@ -223,8 +246,6 @@ Lambda *parse_abstraction(struct ParseParam param)
 
         if (param.token->type != TOKEN_DOT) {
                 printf("Syntax error. Expected dot operator.\n");
-
-                free(variable);
                 free(lambda);
                 return NULL;
         }
@@ -234,7 +255,6 @@ Lambda *parse_abstraction(struct ParseParam param)
         Lambda *body = parse_expression(param);
 
         if (body == NULL) {
-                free(variable);
                 free(lambda);
                 return NULL;
         }
@@ -244,25 +264,46 @@ Lambda *parse_abstraction(struct ParseParam param)
         return lambda;
 }
 
-Lambda *parse_variable(struct Token *token)
+Lambda *parse_shortcut(struct Token *token)
 {
         Lambda *lambda = malloc(sizeof(*lambda));
 
         if (lambda == NULL)
                 return NULL;
 
-        lambda->type = LAMBDA_VARIABLE;
-                
-        char *variable = duplicate_token_string(token);
+        lambda->type = LAMBDA_SHORTCUT;
 
-        if (variable == NULL) {
+        char *shortcut = duplicate_token_string(token);
+
+        if (shortcut == NULL) {
                 free(lambda);
                 return NULL;
         }
 
-        lambda->variable = variable;
+        lambda->shortcut = shortcut;
 
         return lambda;
+}
+
+struct Variable parse_variable(struct ParseParam param)
+{
+        struct Variable variable;
+
+        variable.letter = *param.token->start;
+        variable.subscript = -1;
+
+        if (!isdigit(**param.str)) {
+                // No subscript
+                return variable;
+        }
+
+        // Parse subscript
+        get_token(param.token, param.str);
+
+        int integer = atoi(*param.str);
+        variable.subscript = integer;
+
+        return variable;
 }
 
 Lambda *parse_binding(Lambda *left, struct ParseParam param)
@@ -270,7 +311,7 @@ Lambda *parse_binding(Lambda *left, struct ParseParam param)
         if (left == NULL)
                 return NULL;
 
-        if (!param.bind || left->type != LAMBDA_VARIABLE) {
+        if (!param.bind || left->type != LAMBDA_SHORTCUT) {
                 printf("Syntax error: invalid assignment operator.\n");
                 lambda_free(left);
                 return NULL;
@@ -286,10 +327,10 @@ Lambda *parse_binding(Lambda *left, struct ParseParam param)
                 return NULL;
         }
 
-        char *variable = left->variable;
+        char *shortcut = left->shortcut;
 
         left->type = LAMBDA_BIND;
-        left->bind.name = variable;
+        left->bind.shortcut= shortcut;
         left->bind.term = right;
 
         return left;
@@ -368,8 +409,24 @@ void get_token(struct Token *token, const char **c)
         token->type = TOKEN_VARIABLE;
         token->start = *c;
 
-        while (isalnum(**c) || **c == '_')
+        if (isdigit(**c)) {
+                token->type = TOKEN_NUMERAL;
+                token->start = *c;
+
+                while (isdigit(**c))
+                        (*c)++;
+        } else if (isupper(**c)) {
+                token->type = TOKEN_SHORTCUT;
+                token->start = *c;
+
+                while (isupper(**c))
+                        (*c)++;
+        } else if (islower(**c)) {
+                token->type = TOKEN_VARIABLE;
+                token->start = *c;
+
                 (*c)++;
+        }
 
         token->size = *c - token->start;
 
@@ -391,4 +448,104 @@ char *duplicate_token_string(struct Token *token)
         duplicate[token->size] = '\0';
 
         return duplicate;
+}
+
+Lambda *generate_church_numeral(int integer)
+{
+        struct Variable var_f = {
+                .letter = 'f',
+                .subscript = -1
+        };
+
+        struct Variable var_x = {
+                .letter = 'x',
+                .subscript = -1
+        };
+
+        if (integer < 0)
+                return NULL;
+
+        Lambda *numeral = malloc(sizeof(*numeral));
+
+        if (numeral == NULL)
+                return NULL;
+
+        numeral->type = LAMBDA_ABSTRACTION;
+        numeral->abstraction.binding = var_f;
+        
+        Lambda *inner_abstraction = malloc(sizeof(*inner_abstraction));
+        
+        if (inner_abstraction == NULL) {
+                free(numeral);
+                return NULL;
+        }
+
+        numeral->abstraction.body = inner_abstraction;
+
+        inner_abstraction->type = LAMBDA_ABSTRACTION;
+        inner_abstraction->abstraction.binding = var_x;
+
+        Lambda *right;
+
+        // Particular case without function application 0=\f.\x.x
+        if (integer == 0) {
+                right = malloc(sizeof(*right));
+
+                if (right == NULL) {
+                        inner_abstraction->abstraction.body = NULL;
+                        lambda_free(numeral);
+                        return NULL;
+                }
+        
+                inner_abstraction->abstraction.body = right;
+
+                right->type = LAMBDA_VARIABLE;
+                right->variable = var_x;
+
+                return numeral;
+        }
+
+        // Generate a chain of applications of the form \f.\x.f(f(...(fx)...))
+        Lambda *outer_application = malloc(sizeof(*outer_application));
+        inner_abstraction->abstraction.body = outer_application;
+
+        if (outer_application == NULL){
+                lambda_free(numeral);
+                return NULL;
+        }
+
+        Lambda *application = outer_application;
+
+        for (int k = 0; k < integer; k++) {
+                application->type = LAMBDA_APPLICATION;
+
+                Lambda *left = malloc(sizeof(*left));
+                right = malloc(sizeof(*right));
+
+                application->application.left = left;
+                application->application.right = right;
+
+                if (left == NULL || right == NULL) {
+                        lambda_free(numeral);
+                        return NULL;
+                }
+
+                left->type = LAMBDA_VARIABLE;
+                left->variable = var_f;
+
+                if (k + 1 == integer) {
+                        right->type = LAMBDA_VARIABLE;
+                        right->variable = var_x;
+
+                        application->application.left = left;
+                        application->application.right = right;
+                } else {
+                        application->application.left = left;
+                        application->application.right = right;
+
+                        application = right;
+                }
+        }
+
+        return numeral;
 }
