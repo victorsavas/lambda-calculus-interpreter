@@ -19,10 +19,10 @@ all: $(PROJECT_NAME)
 $(OBJ_DIR):
 	mkdir -p obj
 
-$(PROJECT_NAME): $(OBJS) | $(OBJ_DIR)
+$(PROJECT_NAME): $(OBJS)
 	$(CC) -o $(PROJECT_NAME) $(OBJS) $(CFLAGS) $(INCLUDE_PATHS)
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) -c $< -o $@ $(CFLAGS) $(INCLUDE_PATHS)
 
 clean:
