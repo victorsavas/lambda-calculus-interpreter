@@ -190,7 +190,12 @@ void load_default_shortcuts(HashTable *table)
         const char *str_shortcuts[] = {
                 // Basic combinators
 
+                "S=\\x.\\y.\\z.xz(yz)",
+                "K=\\x.\\y.x",
                 "I=\\x.x",
+                "B=\\x.\\y.\\z.x(yz)",
+                "C=\\x.\\y.\\z.xzy",
+
                 "DUP=\\x.xx",
                 "OMEGA=(\\x.xx)(\\x.xx)",
 
@@ -221,18 +226,25 @@ void load_default_shortcuts(HashTable *table)
                 
                 // Arithmetic
 
-                "ADD=\\p.\\q.\\f.\\x.pf(qfx)",
-                "TIMES=\\p.\\q.\\f.p(qf)",
-
+                "INCR=(\\p.\\q.\\f.\\x.pf(qfx))(\\f.\\x.fx)",
                 "DECR=\\p.(\\p.p(\\x.\\f.\\x.x)(\\f.\\x.f))p(\\f.\\x.x)((\\p."
                      "\\f.\\x.p(\\g.\\h.h(gf))(\\u.x)(\\u.u))p)",
+
+                "ADD=\\p.\\q.\\f.\\x.pf(qfx)",
                 "MINUS=\\p.\\q.q(\\p.\\f.\\x.p(\\g.\\h.h(gf))(\\u.x)(\\u.u))p",
+                "TIMES=\\p.\\q.\\f.p(qf)",
 
                 "ISZERO=\\p.p(\\x.(\\f.\\x.x))(\\f.\\x.f)",
                 "POW=\\p.\\q.q(\\x.\\f.\\x.x)(\\f.\\x.f)(\\f.\\x.fx)(qp)",
 
                 "EVEN=\\n.n(\\p.p(\\f.\\x.x)(\\f.\\x.f))(\\f.\\x.f)",
                 "ODD=\\n.n(\\p.p(\\f.\\x.x)(\\f.\\x.f))(\\f.\\x.x)",
+
+                "SUM=\\f.\\n.\\y.\\x.n(\\p.\\y.y(\\y.\\x.y(p(\\y.\\x.y)yx))(\\"
+                    "y.\\x.p(\\y.\\x.x)y(f(p(\\y.\\x.y))yx)))(\\y.y(\\y.\\x.x)"
+                    "(\\y.\\x.x))(\\y.\\x.x)y(f(n(\\p.\\y.y(\\y.\\x.y(p(\\y.\\"
+                    "x.y)yx))(\\y.\\x.p(\\y.\\x.x)y(f(p(\\y.\\x.y))yx)))(\\f.f"
+                    "(\\f.\\x.x)(\\f.\\x.x))(\\y.\\x.y))yx)",
 
                 // Quantifiers
 

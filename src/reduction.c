@@ -271,6 +271,9 @@ Lambda *get_rightmost(Lambda *lambda)
                         if (right_reduction != NULL)
                                 return right_reduction;
 
+                        if (left->type == LAMBDA_ABSTRACTION)
+                                return left;
+                        
                         rightmost = left;
 
                         continue;

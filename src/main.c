@@ -44,7 +44,7 @@ int main()
                         continue;
                 }
                 
-                reduction_wrapper(lambda, mode, 100);
+                reduction_wrapper(lambda, mode, 1000);
 
                 printf(" -> ");
                 lambda_print(lambda);
