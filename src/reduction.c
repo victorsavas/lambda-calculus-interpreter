@@ -10,6 +10,8 @@
 #include "variable.h"
 #include "variable_capture.h"
 
+#define LONG_CYCLE 10000
+
 struct ReductionParam {
         Lambda *lambda;
         struct Variable binding;
@@ -70,11 +72,13 @@ Lambda *lambda_reduce(Lambda *lambda, Mode mode, unsigned iterations)
                         normal_form = true;
                         break;
                 }
+
                 if (mode & MODE_VERBOSE) {
                         printf(ANSI_GREY "%-5u " ANSI_RESET, i + 1);
                         lambda_print(lambda, application);
                         printf("\n");
-                }
+                } else if ((i + 1) % LONG_CYCLE == 0)
+                        printf(".\n");
 
                 // Tests for variable capture
                 Lambda *capture = variable_capture(application);
