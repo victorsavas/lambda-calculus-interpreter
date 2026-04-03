@@ -5,7 +5,7 @@
 #define STACK_CAP 16
 
 struct Stack {
-        void **array;
+        const void **array;
         size_t top;
         size_t capacity;
 };
@@ -39,13 +39,13 @@ void stack_free(Stack *stack)
         free(stack);
 }
 
-void *stack_push(Stack *stack, void *address)
+const void *stack_push(Stack *stack, const void *address)
 {
         if (stack == NULL)
                 return NULL;
 
         if (stack->top + 1 == stack->capacity) {
-                void **array = realloc(stack->array, stack->capacity << 1);
+                const void **array = realloc(stack->array, sizeof(*array) * (stack->capacity << 1));
 
                 if (array == NULL)
                         return NULL;
@@ -59,7 +59,7 @@ void *stack_push(Stack *stack, void *address)
         return address;
 }
 
-void *stack_pop(Stack *stack)
+const void *stack_pop(Stack *stack)
 {
         if (stack == NULL)
                 return NULL;
@@ -70,7 +70,7 @@ void *stack_pop(Stack *stack)
         return stack->array[--stack->top];
 }
 
-void *stack_peek(Stack *stack)
+const void *stack_peek(Stack *stack)
 {
         if (stack == NULL)
                 return NULL;
@@ -81,13 +81,14 @@ void *stack_peek(Stack *stack)
         return stack->array[stack->top];
 }
 
-void *stack_search(Stack *stack, void *address, bool compare(void *left, void *right))
+const void *stack_search(Stack *stack, const void *address,
+                         bool compare(const void *left, const void *right))
 {
         if (stack == NULL)
                 return NULL;
 
         for (size_t i = 0; i < stack->top; i++) {
-                void *entry = stack->array[i];
+                const void *entry = stack->array[i];
 
                 if (compare(address, entry))
                         return entry;

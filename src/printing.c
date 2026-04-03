@@ -3,78 +3,123 @@
 
 #include "ansi_escapes.h"
 #include "printing.h"
+#include "stack.h"
 
-void lambda_print(Lambda *lambda, Lambda *highlight)
+enum Operator {
+        OPERATOR_EMPTY          = 0,
+        OPERATOR_LP             = 1,
+        OPERATOR_RP             = 2,
+        OPERATOR_LAMBDA         = 3,
+        OPERATOR_DOT            = 4,
+        OPERATOR_SPACE          = 5,
+        OPERATOR_EQUALS         = 6,
+        OPERATOR_GREEN          = 7,
+        OPERATOR_RED            = 8,
+        OPERATOR_RESET          = 9
+};
+
+const char *operator_table[] = {
+        "",
+        "(",
+        ")",
+        "λ",
+        ".",
+        " ",
+        "=",
+        ANSI_GREEN,
+        ANSI_RED,
+        ANSI_RESET
+};
+
+void lambda_print(const Lambda *lambda, const Lambda *highlight)
 {
         if (lambda == NULL)
                 return;
 
-        switch (lambda->type) {
-        case LAMBDA_BIND:
-                printf("%s=", lambda->bind.shortcut);
-                lambda_print(lambda->bind.term, highlight);
-                break;
-        
-        case LAMBDA_SHORTCUT:
-                printf("%s", lambda->shortcut);
-                break;
-        
-        case LAMBDA_VARIABLE:
-                if (lambda->variable.subscript < 0)
-                        printf("%c", lambda->variable.letter);
-                else
-                        printf("%c%d",
-                                lambda->variable.letter,
-                                lambda->variable.subscript);
+        Stack *lambda_stack = stack_init();
+        Stack *operator_stack = stack_init();
 
-                break;
-
-        case LAMBDA_ABSTRACTION:
-                if (lambda->abstraction.binding.subscript < 0)
-                        printf("λ%c.", lambda->abstraction.binding.letter);
-                else
-                        printf("λ%c%d.",
-                                lambda->abstraction.binding.letter,
-                                lambda->abstraction.binding.subscript);
-                
-                lambda_print(lambda->abstraction.body, highlight);
-                
-                break;
-
-        case LAMBDA_APPLICATION:
-                Lambda *left = lambda->application.left;
-                Lambda *right = lambda->application.right;
-
-                bool left_parenthesis = left->type == LAMBDA_ABSTRACTION;
-                bool right_parenthesis = right->type != LAMBDA_VARIABLE;
-
-                bool color = highlight != NULL && lambda == highlight;
-
-                if (color)
-                        printf(ANSI_GREEN);
-
-                if (left_parenthesis)
-                        printf("(");
-
-                lambda_print(lambda->application.left, highlight);
-
-                if (left_parenthesis)
-                        printf(")");
-
-                if (color)
-                        printf(ANSI_RED);
-
-                if (right_parenthesis)
-                        printf("(");
-
-                lambda_print(lambda->application.right, highlight);
-
-                if (right_parenthesis)
-                        printf(")");
-
-                if (color)
-                        printf(ANSI_RESET);
-
-                break;
+        if (lambda_stack == NULL || operator_stack == NULL) {
+                stack_free(lambda_stack);
+                stack_free(operator_stack);
+                return;
         }
+
+        stack_push(lambda_stack, lambda);
+        stack_push(operator_stack, operator_table[OPERATOR_EMPTY]);
+
+        const Lambda *lambda_top = stack_pop(lambda_stack);
+        const char *operator_top = NULL;
+
+        while (lambda_top != NULL) {
+                switch (lambda_top->type) {
+                case LAMBDA_BIND:
+                        printf("%s", lambda->bind.shortcut);
+                        stack_push(lambda_stack, lambda_top->bind.term);
+                        stack_push(operator_stack, operator_table[OPERATOR_EQUALS]);
+                        break;
+
+                case LAMBDA_SHORTCUT:
+                        printf("%s", lambda->shortcut);
+                        stack_push(operator_stack, operator_table[OPERATOR_SPACE]);
+                        break;
+
+                case LAMBDA_VARIABLE:
+                        struct Variable variable = lambda_top->variable;
+                        
+                        variable_print(variable);
+
+                        break;
+                
+                case LAMBDA_ABSTRACTION:
+                        struct Variable binding = lambda_top->abstraction.binding;
+                        
+                        printf(operator_table[OPERATOR_LAMBDA]);
+
+                        variable_print(binding);
+
+                        stack_push(lambda_stack, lambda_top->abstraction.body);
+                        stack_push(operator_stack, operator_table[OPERATOR_DOT]);
+
+                        break;
+
+                case LAMBDA_APPLICATION:
+                        Lambda *left = lambda_top->application.left;
+                        Lambda *right = lambda_top->application.right;
+
+                        stack_push(lambda_stack, right);
+                        stack_push(lambda_stack, left);
+
+                        bool left_parenthesis = left->type == LAMBDA_ABSTRACTION;
+                        bool right_parenthesis = right->type != LAMBDA_VARIABLE;
+
+                        bool color = lambda_top == highlight;
+
+                        if (right_parenthesis) {
+                                stack_push(operator_stack, operator_table[OPERATOR_RP]);
+                                stack_push(operator_stack, operator_table[OPERATOR_LP]);
+                        } else {
+                                stack_push(operator_stack, operator_table[OPERATOR_EMPTY]);
+                        }
+
+                        if (left_parenthesis) {
+                                stack_push(operator_stack, operator_table[OPERATOR_RP]);
+                                stack_push(operator_stack, operator_table[OPERATOR_LP]);
+                        } else {
+                                stack_push(operator_stack, operator_table[OPERATOR_EMPTY]);
+                        }
+                }
+
+                lambda_top = stack_pop(lambda_stack);
+
+                do {
+                        operator_top = stack_pop(operator_stack);
+
+                        if (operator_top != NULL)
+                                printf("%s", operator_top);
+                } while (operator_top == operator_table[OPERATOR_RP]);
+        }
+
+        stack_free(lambda_stack);
+        stack_free(operator_stack);
 }
