@@ -1,5 +1,7 @@
+#include <stdio.h>
 #include <stdlib.h>
 
+#include "ansi_escape.h"
 #include "duplicate.h"
 #include "shortcut.h"
 
@@ -81,13 +83,17 @@ bool replace_shortcut(struct ReplaceParam param)
 
         Lambda *binding = hashtable_search(table, shortcut);
 
-        if (binding == NULL)
+        if (binding == NULL) {
+                printf(ANSI_RED "Error. Undefined entry \"%s\".\n" ANSI_RESET, shortcut);
                 return false;
+        }
                 
         Lambda *duplicate = lambda_duplicate(binding->bind.term);
 
-        if (duplicate == NULL)
+        if (duplicate == NULL) {
+                printf(ANSI_RED "Error. Duplication fail.\n" ANSI_RESET);
                 return false;
+        }
 
         free(shortcut);
 

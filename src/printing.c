@@ -1,9 +1,10 @@
 #include <stdbool.h>
 #include <stdio.h>
 
+#include "ansi_escape.h"
 #include "printing.h"
 
-void lambda_print(Lambda *lambda)
+void lambda_print(Lambda *lambda, Lambda *highlight)
 {
         if (lambda == NULL)
                 return;
@@ -11,7 +12,7 @@ void lambda_print(Lambda *lambda)
         switch (lambda->type) {
         case LAMBDA_BIND:
                 printf("%s=", lambda->bind.shortcut);
-                lambda_print(lambda->bind.term);
+                lambda_print(lambda->bind.term, highlight);
                 break;
         
         case LAMBDA_SHORTCUT:
@@ -36,7 +37,7 @@ void lambda_print(Lambda *lambda)
                                 lambda->abstraction.binding.letter,
                                 lambda->abstraction.binding.subscript);
                 
-                lambda_print(lambda->abstraction.body);
+                lambda_print(lambda->abstraction.body, highlight);
                 
                 break;
 
@@ -47,21 +48,35 @@ void lambda_print(Lambda *lambda)
                 bool left_parenthesis = left->type == LAMBDA_ABSTRACTION;
                 bool right_parenthesis = right->type != LAMBDA_VARIABLE;
 
+                bool color = highlight != NULL && lambda == highlight;
+
+                if (color)
+                        printf(ANSI_BLUE);
+
                 if (left_parenthesis)
                         printf("(");
 
-                lambda_print(lambda->application.left);
+                lambda_print(lambda->application.left, highlight);
 
                 if (left_parenthesis)
                         printf(")");
 
+                if (color)
+                        printf(ANSI_RESET);
+                
+                if (color)
+                        printf(ANSI_GREEN);
+
                 if (right_parenthesis)
                         printf("(");
 
-                lambda_print(lambda->application.right);
+                lambda_print(lambda->application.right, highlight);
 
                 if (right_parenthesis)
                         printf(")");
+
+                if (color)
+                        printf(ANSI_RESET);
 
                 break;
         }

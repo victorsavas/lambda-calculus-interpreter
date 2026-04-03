@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "ansi_escape.h"
 #include "parsing.h"
 
 typedef enum TokenType {
@@ -116,16 +117,16 @@ Lambda *parse_expression(struct ParseParam param)
 
         case TOKEN_RIGHT_PARENTHESIS:
         case TOKEN_END:
-                printf("Syntax error. Expression expected.\n");
+                printf(ANSI_RED "Syntax error. Expression expected.\n" ANSI_RESET);
                 return NULL;
 
         case TOKEN_DOT:
         case TOKEN_EQUALS:
-                printf("Syntax error. Invalid operator.\n");
+                printf(ANSI_RED "Syntax error. Invalid operator.\n" ANSI_RESET);
                 return NULL;
 
         case TOKEN_INVALID:
-                printf("Syntax error. Invalid token.\n");
+                printf(ANSI_RED "Syntax error. Invalid token.\n" ANSI_RESET);
                 return NULL;
         }
 
@@ -182,12 +183,12 @@ Lambda *parse_application(struct ParseParam param)
 
                 case TOKEN_LAMBDA:
                 case TOKEN_DOT:
-                        printf("Syntax error. Invalid operator.\n");
+                        printf(ANSI_RED "Syntax error. Invalid operator.\n" ANSI_RESET);
                         lambda_free(left);
                         return NULL;
 
                 case TOKEN_INVALID:
-                        printf("Syntax error. Invalid character.\n");
+                        printf(ANSI_RED "Syntax error. Invalid character.\n" ANSI_RESET);
                         lambda_free(left);
                         return NULL;
 
@@ -232,7 +233,7 @@ Lambda *parse_abstraction(struct ParseParam param)
         get_token(param.token, param.str);
 
         if (param.token->type != TOKEN_VARIABLE) {
-                printf("Syntax error. Expected variable token.\n");
+                printf(ANSI_RED "Syntax error. Expected variable token.\n" ANSI_RESET);
                 return NULL;
         }
 
@@ -249,7 +250,7 @@ Lambda *parse_abstraction(struct ParseParam param)
         get_token(param.token, param.str);
 
         if (param.token->type != TOKEN_DOT) {
-                printf("Syntax error. Expected dot operator.\n");
+                printf(ANSI_RED "Syntax error. Expected dot operator.\n" ANSI_RESET);
                 free(lambda);
                 return NULL;
         }
@@ -316,7 +317,7 @@ Lambda *parse_binding(Lambda *left, struct ParseParam param)
                 return NULL;
 
         if (!param.bind || left->type != LAMBDA_SHORTCUT) {
-                printf("Syntax error: invalid assignment operator.\n");
+                printf(ANSI_RED "Syntax error: invalid assignment operator.\n" ANSI_RESET);
                 lambda_free(left);
                 return NULL;
         }
@@ -343,7 +344,7 @@ Lambda *parse_binding(Lambda *left, struct ParseParam param)
 Lambda *parse_end(Lambda *lambda, bool parenthesis)
 {
         if (parenthesis) {
-                printf("Syntax error. Missing right parenthesis.\n");
+                printf(ANSI_RED "Syntax error. Missing right parenthesis.\n" ANSI_RESET);
                 lambda_free(lambda);
                 return NULL;
         }
@@ -423,7 +424,7 @@ void get_token(struct Token *token, const char **c)
                 token->type = TOKEN_SHORTCUT;
                 token->start = *c;
 
-                while (isupper(**c))
+                while (isupper(**c) || **c == '_')
                         (*c)++;
         } else if (islower(**c)) {
                 token->type = TOKEN_VARIABLE;

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "alpha_rename.h"
+#include "ansi_escape.h"
 #include "duplicate.h"
 #include "printing.h"
 #include "reduction.h"
@@ -37,41 +38,59 @@ bool lambda_is_normal(Lambda *lambda)
 
 Lambda *lambda_reduce(Lambda *lambda, Mode mode, unsigned iterations)
 {
-        if (!(mode & MODE_REDUCE))
-                return lambda;
-
         if (lambda == NULL)
                 return NULL;
         
-        for (unsigned i = 0; i < iterations; i++) {
+        bool normal_form = false;
+
+        if (!(mode & (MODE_REDUCE | MODE_VERBOSE))) {
+                lambda_print(lambda, NULL);
+                
+                normal_form = lambda_is_normal(lambda);
+
+                if (normal_form)
+                        printf(ANSI_BLUE " (Normal form.)\n" ANSI_RESET);
+                else
+                        printf("\n");
+
+                return lambda;
+        }
+
+        unsigned i;
+        
+        for (i = 0; i < iterations; i++) {
                 Lambda *application;
 
-                if (mode & MODE_CALL_BY_VALUE)
+                if (mode & MODE_RIGHTMOST)
                         application = get_rightmost(lambda);
                 else
                         application = get_leftmost(lambda);
 
-                // Normal form reached
-                if (application == NULL)
+                if (application == NULL) {
+                        normal_form = true;
                         break;
-
+                }
                 if (mode & MODE_VERBOSE) {
-                        printf("%6u: ", i);
-                        lambda_print(lambda);
-                        printf(" -> [");
-                        lambda_print(application);
-                        printf("]\n");
+                        printf(ANSI_GREY "%-5u " ANSI_RESET, i + 1);
+                        lambda_print(lambda, application);
+                        printf("\n");
                 }
 
                 // Tests for variable capture
                 Lambda *capture = variable_capture(application);
 
-                if (capture == NULL) {
+                if (capture == NULL)
                         beta_reduction(application);
-                }
                 else
                         alpha_rename(capture, application);
         }
+
+        lambda_print(lambda, NULL);
+
+        if (normal_form)
+                printf(ANSI_BLUE " (Normal form reached after %d steps.)\n" ANSI_RESET, i);
+        else
+                printf(ANSI_BLUE " (Normal form not reached.)\n" ANSI_RESET);
 
         return lambda;
 }

@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "ansi_escape.h"
 #include "printing.h"
 #include "hashtable.h"
 
@@ -17,6 +18,7 @@ typedef struct Node {
 
 typedef struct HashTable {
         Node buckets[BUCKET_COUNT];
+        size_t entries_count;
 } HashTable;
 
 static void nodes_free(Node *node);
@@ -24,6 +26,8 @@ static Node *node_tail(Node *node);
 static uint32_t hash_function(const char *key);
 
 static void load_default_shortcuts(HashTable *table);
+
+static int compare_entries(const void *left, const void *right);
 
 HashTable *hashtable_init()
 {
@@ -67,6 +71,7 @@ Lambda *hashtable_insert(HashTable *table, Lambda *lambda)
 
         if (bucket->value == NULL) {
                 bucket->value = lambda;
+                table->entries_count++;
                 return lambda;
         }
         
@@ -93,6 +98,8 @@ Lambda *hashtable_insert(HashTable *table, Lambda *lambda)
         node->next = bucket->next;
 
         bucket->next = node;
+
+        table->entries_count++;
 
         return lambda;
 }
@@ -162,6 +169,8 @@ Lambda *hashtable_delete(HashTable *table, const char *key)
                 }
         }
 
+        table->entries_count--;
+
         return lambda;
 }
 
@@ -170,19 +179,46 @@ void hashtable_print(HashTable *table)
         if (table == NULL)
                 return;
 
-        for (size_t i = 0; i < BUCKET_COUNT; i++) {
-                Node *node = &table->buckets[i];
+        size_t entries_count = table->entries_count;
+
+        if (entries_count == 0) {
+                printf("Empty.\n");
+        }
+
+        Lambda **array = malloc(sizeof(*array) * entries_count);
+
+        if (array == NULL)
+                return;
+
+        size_t i = 0;
+
+        for (size_t j = 0; j < BUCKET_COUNT && i < entries_count; j++) {
+                Node *node = &table->buckets[j];
 
                 if (node->value == NULL)
                         continue;
 
                 while (node != NULL) {
-                        lambda_print(node->value);
-                        printf("\n");
-
+                        array[i++] = node->value;
                         node = node->next;
                 }
         }
+
+        qsort(array, entries_count, sizeof(*array), compare_entries);
+
+        for (i = 0; i < entries_count; i++) {
+                printf(ANSI_BLUE "%-4d " ANSI_RESET, i + 1);
+                
+                char *shortcut = array[i]->bind.shortcut;
+                Lambda *term = array[i]->bind.term;
+
+                printf("%-8s " ANSI_GREEN, shortcut);
+
+                lambda_print(term, NULL);
+                printf(ANSI_RESET "\n");
+        }
+        
+        free(array);
 }
 
 void load_default_shortcuts(HashTable *table)
@@ -234,7 +270,7 @@ void load_default_shortcuts(HashTable *table)
                 "MINUS=\\p.\\q.q(\\p.\\f.\\x.p(\\g.\\h.h(gf))(\\u.x)(\\u.u))p",
                 "TIMES=\\p.\\q.\\f.p(qf)",
 
-                "ISZERO=\\p.p(\\x.(\\f.\\x.x))(\\f.\\x.f)",
+                "IS_ZERO=\\p.p(\\x.(\\f.\\x.x))(\\f.\\x.f)",
                 "POW=\\p.\\q.q(\\x.\\f.\\x.x)(\\f.\\x.f)(\\f.\\x.fx)(qp)",
 
                 "EVEN=\\n.n(\\p.p(\\f.\\x.x)(\\f.\\x.f))(\\f.\\x.f)",
@@ -278,10 +314,21 @@ void load_default_shortcuts(HashTable *table)
                 Lambda *shortcut = lambda_parse(str_shortcuts[i]);
 
                 if (!hashtable_insert(table, shortcut)) {
-                        printf("Error at index %d: \"%s\".\n", i, str_shortcuts[i]);
+                        printf(ANSI_RED "Error at index %d: \"%s\".\n" ANSI_RESET, i, str_shortcuts[i]);
                         lambda_free(shortcut);
                 }
         }
+}
+
+int compare_entries(const void *left, const void *right)
+{
+        Lambda *l_left = *(Lambda **)left;
+        Lambda *l_right = *(Lambda **)right;
+
+        char *str_left = l_left->shortcut;
+        char *str_right = l_right->shortcut;
+
+        return strcmp(str_left, str_right);
 }
 
 uint32_t hash_function(const char *key)

@@ -12,7 +12,6 @@
 
 #define BUF_LEN 65536
 
-static bool reduction_wrapper(Lambda *lambda, Mode mode, unsigned iterations);
 static char *fgets_wrapper(char *buffer, size_t buf_size, FILE *file);  
 
 int main()
@@ -20,13 +19,18 @@ int main()
         HashTable *table = hashtable_init();
         char buffer[BUF_LEN];
 
-        Mode mode = 0;
+        Mode mode = MODE_DISABLE;
+        int iterations = 1000;
 
-        while (!(mode & MODE_EXIT)) {
+        hello_message();
+
+        while (mode != MODE_EXIT) {
+                printf("λ> ");
+
                 fgets_wrapper(buffer, BUF_LEN, stdin);
                 
                 if (buffer[0] == ':') {
-                        mode = parse_command(buffer, mode, table);
+                        parse_command(buffer, table, &mode, &iterations);
                         continue;
                 }
 
@@ -39,16 +43,11 @@ int main()
                 bool valid_term = replace_shortcuts(lambda, table);
 
                 if (!valid_term) {
-                        printf("Error. Undefined free variable.\n");
                         lambda_free(lambda);
                         continue;
                 }
                 
-                reduction_wrapper(lambda, mode, 1000);
-
-                printf(" -> ");
-                lambda_print(lambda);
-                printf("\n");
+                lambda_reduce(lambda, mode, iterations);
 
                 if (!hashtable_insert(table, lambda))
                         lambda_free(lambda);
@@ -57,11 +56,6 @@ int main()
         hashtable_free(table);
 
         return 0;
-}
-
-bool reduction_wrapper(Lambda *lambda, Mode mode, unsigned iterations)
-{
-        lambda_reduce(lambda, mode, iterations);
 }
 
 char *fgets_wrapper(char *buffer, size_t buf_len, FILE *file)
