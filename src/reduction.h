@@ -2,8 +2,7 @@
 
 #include <stdbool.h>
 
-#include "commands.h"
 #include "parsing.h"
 
 bool lambda_normal(Lambda *lambda);
-Lambda *lambda_reduce(Lambda *lambda, struct Mode mode);
+Lambda *lambda_reduce(Lambda *lambda);

@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <signal.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,30 +14,36 @@
 
 #define BUF_LEN 65536
 
+struct Mode mode = {
+        .exit = false,
+        .interrupt = false,
+        .reduction_enabled = false,
+        .verbose = false,
+        .strat = STRAT_NORMAL,
+        .depth = 1000
+};
+
+HashTable *table;
+
+static void interrupt_handle(int signal);
 static char *fgets_wrapper(char *buffer, size_t buf_size, FILE *file);  
 
 int main()
 {
-        HashTable *table = hashtable_init();
+        table = hashtable_init();
         char buffer[BUF_LEN];
-
-        struct Mode mode = {
-                .exit = false,
-                .reduction_enabled = false,
-                .verbose = false,
-                .strat = STRAT_NORMAL,
-                .depth = 1000
-        };
 
         hello_message();
 
         while (!mode.exit) {
+                signal(SIGINT, interrupt_handle);
+
                 printf("λ> ");
 
                 fgets_wrapper(buffer, BUF_LEN, stdin);
                 
                 if (buffer[0] == ':') {
-                        parse_command(buffer, table, &mode);
+                        parse_command(buffer, table);
                         continue;
                 }
 
@@ -53,11 +60,15 @@ int main()
                         continue;
                 }
                 
-                lambda_reduce(lambda, mode);
+                lambda_reduce(lambda);
+
+                mode.interrupt = false;
 
                 if (!hashtable_insert(table, lambda))
                         lambda_free(lambda);
         }
+
+        printf("Exiting.\n");
 
         hashtable_free(table);
 
@@ -82,4 +93,12 @@ char *fgets_wrapper(char *buffer, size_t buf_len, FILE *file)
         *p = '\0';
 
         return buffer;
+}
+
+void interrupt_handle(int signal)
+{
+        printf("\nExiting.\n");
+        hashtable_free(table);
+
+        exit(1);
 }

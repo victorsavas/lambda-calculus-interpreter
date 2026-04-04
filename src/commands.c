@@ -10,13 +10,13 @@
 const char space[] = " \t\n\v\f\r";
 
 static void command_help();
-static void command_reduce(struct Mode *mode);
+static void command_reduce();
 static void command_remove(HashTable *table);
 
-static void reduce_s(struct Mode *mode, bool strat_parse);
-static void reduce_i(struct Mode *mode, bool steps_parse);
-static void reduce_v(struct Mode *mode, bool verbose_parse);
-static void reduce_enable(struct Mode *mode, char *token, bool enable_parse);
+static void reduce_s(struct Mode *new_mode, bool strat_parse);
+static void reduce_i(struct Mode *new_mode, bool steps_parse);
+static void reduce_v(struct Mode *new_mode, bool verbose_parse);
+static void reduce_enable(struct Mode *new_mode, char *token, bool enable_parse);
 
 void hello_message()
 {
@@ -29,7 +29,7 @@ void hello_message()
         );
 }
 
-void parse_command(char *str, HashTable *table, struct Mode *mode)
+void parse_command(char *str, HashTable *table)
 {
         if (str == NULL)
                 return;
@@ -37,7 +37,7 @@ void parse_command(char *str, HashTable *table, struct Mode *mode)
         char *token = strtok(str, space);
 
         if (strcmp(token, ":exit") == 0)
-                mode->exit = true;
+                mode.exit = true;
         else if (strcmp(token, ":help") == 0)
                 command_help();
         else if (strcmp(token, ":entries") == 0)
@@ -45,7 +45,7 @@ void parse_command(char *str, HashTable *table, struct Mode *mode)
         else if (strcmp(token, ":remove") == 0)
                 command_remove(table);
         else if (strcmp(token, ":reduce") == 0)
-                command_reduce(mode);
+                command_reduce();
         else
                 printf(
                         "Invalid command \"%s\".\n"
@@ -111,7 +111,7 @@ void command_help()
         );
 }
 
-void command_reduce(struct Mode *mode)
+void command_reduce()
 {
         bool strat_parse = false;
         bool steps_parse = false;
@@ -132,7 +132,7 @@ void command_reduce(struct Mode *mode)
                 return;
         }
         
-        struct Mode new_mode = *mode;
+        struct Mode new_mode = mode;
         new_mode.verbose = false;
 
         while (token != NULL) {
@@ -156,7 +156,7 @@ void command_reduce(struct Mode *mode)
                 token = strtok(NULL, space);
         }
 
-        *mode = new_mode;
+        mode = new_mode;
 }
 
 void command_remove(HashTable *table)
@@ -176,7 +176,7 @@ void command_remove(HashTable *table)
                 printf("No \"%s\" entry found.\n", token);
 }
 
-void reduce_s(struct Mode *mode, bool strat_parse)
+void reduce_s(struct Mode *new_mode, bool strat_parse)
 {
         if (strat_parse) {
                 printf(
@@ -185,7 +185,7 @@ void reduce_s(struct Mode *mode, bool strat_parse)
                         ANSI_RESET
                 );
 
-                mode->exit = true;
+                new_mode->exit = true;
                 return;
         }
 
@@ -209,13 +209,13 @@ void reduce_s(struct Mode *mode, bool strat_parse)
                         ":reduce -s [normal | applicative]\n"
                 );
 
-                mode->exit = true;
+                new_mode->exit = true;
                 return;
         }
 
         for (int i = 0; i < 2; i++)
                 if (strcmp(token, strat[i]) == 0) {
-                        mode->strat = strat_code[i];
+                        new_mode->strat = strat_code[i];
                         return;
                 }
 
@@ -227,10 +227,10 @@ void reduce_s(struct Mode *mode, bool strat_parse)
                 token
         );
 
-        mode->exit = true;
+        new_mode->exit = true;
 }
 
-void reduce_i(struct Mode *mode, bool steps_parse)
+void reduce_i(struct Mode *new_mode, bool steps_parse)
 {
         if (steps_parse) {
                 printf(
@@ -239,7 +239,7 @@ void reduce_i(struct Mode *mode, bool steps_parse)
                         ANSI_RESET
                 );
 
-                mode->exit = true;
+                new_mode->exit = true;
                 return;
         }
 
@@ -253,7 +253,7 @@ void reduce_i(struct Mode *mode, bool steps_parse)
                         ":reduce -i [STEPS]\n"
                 );
 
-                mode->exit = true;
+                new_mode->exit = true;
                 return;
         }
 
@@ -267,7 +267,7 @@ void reduce_i(struct Mode *mode, bool steps_parse)
                         token
                 );
 
-                mode->exit = true;
+                new_mode->exit = true;
                 return;
         }
 
@@ -282,14 +282,14 @@ void reduce_i(struct Mode *mode, bool steps_parse)
                         ":reduce -i [STEPS]\n"
                 );
                 
-                mode->exit = true;
+                new_mode->exit = true;
                 return;
         }
 
-        mode->depth = depth;
+        new_mode->depth = depth;
 }
 
-void reduce_v(struct Mode *mode, bool verbose_parse)
+void reduce_v(struct Mode *new_mode, bool verbose_parse)
 {
         if (verbose_parse) {
                 printf(
@@ -298,14 +298,14 @@ void reduce_v(struct Mode *mode, bool verbose_parse)
                         ANSI_RESET
                 );
 
-                mode->exit = true;
+                new_mode->exit = true;
                 return;
         }
 
-        mode->verbose = true;
+        new_mode->verbose = true;
 }
 
-void reduce_enable(struct Mode *mode, char *token, bool enable_parse)
+void reduce_enable(struct Mode *new_mode, char *token, bool enable_parse)
 {
         if (enable_parse) {
                 printf(
@@ -316,7 +316,7 @@ void reduce_enable(struct Mode *mode, char *token, bool enable_parse)
                         token
                 );
 
-                mode->exit = true;
+                new_mode->exit = true;
                 return;
         }
 
@@ -326,12 +326,12 @@ void reduce_enable(struct Mode *mode, char *token, bool enable_parse)
         };
 
         if (strcmp(token, enable[0]) == 0) {
-                mode->reduction_enabled = true;
+                new_mode->reduction_enabled = true;
                 return;
         }
         
         if (strcmp(token, enable[1]) == 0) {
-                mode->reduction_enabled = false;
+                new_mode->reduction_enabled = false;
                 return;
         }
         
@@ -343,5 +343,5 @@ void reduce_enable(struct Mode *mode, char *token, bool enable_parse)
                 token
         );
 
-        mode->exit = true;
+        new_mode->exit = true;
 }

@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -5,6 +6,7 @@
 
 #include "alpha_rename.h"
 #include "ansi_escapes.h"
+#include "commands.h"
 #include "duplicate.h"
 #include "printing.h"
 #include "reduction.h"
@@ -17,6 +19,7 @@ static Lambda *get_redex_normal(Lambda *lambda);
 static Lambda *get_redex_applicative(Lambda *lambda);
 
 static void beta_reduction(Lambda *redex);
+static void interrupt_handle(int signal);
 
 bool lambda_normal(Lambda *lambda)
 {
@@ -28,8 +31,10 @@ bool lambda_normal(Lambda *lambda)
         return redex == NULL;
 }
 
-Lambda *lambda_reduce(Lambda *lambda, struct Mode mode)
+Lambda *lambda_reduce(Lambda *lambda)
 {
+        signal(SIGINT, interrupt_handle);
+ 
         if (lambda == NULL)
                 return NULL;
 
@@ -53,6 +58,9 @@ Lambda *lambda_reduce(Lambda *lambda, struct Mode mode)
         unsigned int i;
 
         for (i = 0; i < mode.depth; i++) {
+                if (mode.interrupt)
+                        return NULL;
+
                 Lambda *redex = NULL;
 
                 switch (mode.strat) {
@@ -294,4 +302,15 @@ Lambda *get_redex_applicative(Lambda *lambda)
         stack_free(stack);
 
         return redex;
+}
+
+void interrupt_handle(int signal)
+{
+        mode.interrupt = true;
+
+        printf(
+                ANSI_RED
+                "\nKilled.\n"
+                ANSI_RESET
+        );
 }
