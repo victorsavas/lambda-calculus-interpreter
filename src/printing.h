@@ -2,4 +2,4 @@
 
 #include "parsing.h"
 
-void lambda_print(const Lambda *lambda, const Lambda *highlight);
+void lambda_print(const Lambda *lambda, const Lambda *redex);

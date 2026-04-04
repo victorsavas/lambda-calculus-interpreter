@@ -31,7 +31,7 @@ const char *operator_table[] = {
         ANSI_RESET
 };
 
-void lambda_print(const Lambda *lambda, const Lambda *highlight)
+void lambda_print(const Lambda *lambda, const Lambda *redex)
 {
         if (lambda == NULL)
                 return;
@@ -47,14 +47,26 @@ void lambda_print(const Lambda *lambda, const Lambda *highlight)
 
         stack_push(operator_stack, operator_table[OPERATOR_EMPTY]);
 
-        const Lambda *lambda_top = lambda;
+        const Lambda *top = lambda;
         const char *operator_top = NULL;
 
-        while (lambda_top != NULL) {
-                switch (lambda_top->type) {
+        while (top != NULL) {
+                if (redex != NULL) {
+                        if (top == redex->right) {
+                                stack_push(operator_stack, operator_table[OPERATOR_RESET]);
+                                printf(ANSI_GREEN);
+                        }
+
+                        if (top == redex->left) {
+                                stack_push(operator_stack, operator_table[OPERATOR_RESET]);
+                                printf(ANSI_RED);
+                        }
+                }
+
+                switch (top->type) {
                 case LAMBDA_ENTRY:
                         printf("%s", lambda->shortcut);
-                        stack_push(lambda_stack, lambda_top->term);
+                        stack_push(lambda_stack, top->term);
                         stack_push(operator_stack, operator_table[OPERATOR_EQUALS]);
                         break;
 
@@ -64,27 +76,27 @@ void lambda_print(const Lambda *lambda, const Lambda *highlight)
                         break;
 
                 case LAMBDA_VARIABLE:
-                        struct Variable variable = lambda_top->variable;
+                        struct Variable variable = top->variable;
                         
                         variable_print(variable);
 
                         break;
                 
                 case LAMBDA_ABSTRACTION:
-                        variable = lambda_top->variable;
+                        variable = top->variable;
                         
                         printf("%s", operator_table[OPERATOR_LAMBDA]);
 
                         variable_print(variable);
 
-                        stack_push(lambda_stack, lambda_top->body);
+                        stack_push(lambda_stack, top->body);
                         stack_push(operator_stack, operator_table[OPERATOR_DOT]);
 
                         break;
 
                 case LAMBDA_APPLICATION:
-                        Lambda *left = lambda_top->left;
-                        Lambda *right = lambda_top->right;
+                        Lambda *left = top->left;
+                        Lambda *right = top->right;
 
                         stack_push(lambda_stack, right);
                         stack_push(lambda_stack, left);
@@ -92,7 +104,7 @@ void lambda_print(const Lambda *lambda, const Lambda *highlight)
                         bool left_parenthesis = left->type == LAMBDA_ABSTRACTION;
                         bool right_parenthesis = right->type != LAMBDA_VARIABLE;
 
-                        bool color = lambda_top == highlight;
+                        bool color = top == redex;
 
                         if (right_parenthesis) {
                                 stack_push(operator_stack, operator_table[OPERATOR_RP]);
@@ -109,14 +121,16 @@ void lambda_print(const Lambda *lambda, const Lambda *highlight)
                         }
                 }
 
-                lambda_top = stack_pop(lambda_stack);
+                top = stack_pop(lambda_stack);
 
                 do {
                         operator_top = stack_pop(operator_stack);
 
                         if (operator_top != NULL)
                                 printf("%s", operator_top);
-                } while (operator_top == operator_table[OPERATOR_RP]);
+                } while (
+                        operator_top == operator_table[OPERATOR_RP]
+                     || operator_top == operator_table[OPERATOR_RESET]);
         }
 
         stack_free(lambda_stack);
