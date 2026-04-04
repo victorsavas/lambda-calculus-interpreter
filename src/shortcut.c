@@ -4,143 +4,197 @@
 #include "ansi_escapes.h"
 #include "duplicate.h"
 #include "shortcut.h"
+#include "stack.h"
 
-struct ReplaceParam {
-        Lambda *lambda;
-        HashTable *table;
-};
-
-static bool replace_recursive(struct ReplaceParam param);
-
-static bool replace_bind(struct ReplaceParam param);
-static bool replace_shortcut(struct ReplaceParam param);
-static bool replace_variable(struct ReplaceParam param);
-static bool replace_abstraction(struct ReplaceParam param);
-static bool replace_application(struct ReplaceParam param);
+static Lambda *generate_numeral(int integer);
 
 bool replace_shortcuts(Lambda *lambda, HashTable *table)
 {
-        if (table == NULL || lambda == NULL)
+        if (lambda == NULL)
                 return false;
 
-        struct ReplaceParam param = {
-                .lambda = lambda,
-                .table = table,
-        };
+        Stack *stack = stack_init();
 
-        bool success = replace_recursive(param);
-
-        return success;
-}
-
-bool replace_recursive(struct ReplaceParam param)
-{
-        Lambda *lambda = param.lambda;
-        HashTable *table = param.table;
-
-        if (lambda == NULL || table == NULL)
+        if (stack == NULL)
                 return false;
-        
-        switch (lambda->type) {
-        case LAMBDA_VARIABLE:
-                return true;
 
-        case LAMBDA_BIND:
-                return replace_bind(param);
+        Lambda *top = lambda;
 
-        case LAMBDA_SHORTCUT:
-                return replace_shortcut(param);
-        
-        case LAMBDA_ABSTRACTION:
-                return replace_abstraction(param);
+        while (top != NULL) {
+                switch (top->type) {
+                case LAMBDA_ENTRY:
+                        stack_push(stack, top->term);
+                        break;
 
-        case LAMBDA_APPLICATION:
-                return replace_application(param);
+                case LAMBDA_SHORTCUT:
+                        char *shortcut = top->shortcut;
+
+                        Lambda *entry = hashtable_search(table, shortcut);
+
+                        if (entry == NULL) {
+                                printf(
+                                        ANSI_RED
+                                        "Error. Undefined entry \"%s\".\n"
+                                        ANSI_RESET,
+                                        shortcut
+                                );
+                                goto error;
+                        }
+
+                        Lambda *duplicate = lambda_duplicate(entry->term);
+
+                        if (duplicate == NULL) {
+                                printf(ANSI_RED "Error. Duplication fail.\n" ANSI_RESET);
+                                goto error;
+                        }
+
+                        *top = *duplicate;
+
+                        free(shortcut);
+                        free(duplicate);                        
+
+                        break;
+
+                case LAMBDA_VARIABLE:
+                        break;
+
+                case LAMBDA_ABSTRACTION:
+                        stack_push(stack, top->body);
+                        break;
+
+                case LAMBDA_APPLICATION:
+                        stack_push(stack, top->right);
+                        stack_push(stack, top->left);
+
+                        break;
+
+                case LAMBDA_NUMERAL:
+                        int integer = top->numeral;
+                        Lambda *numeral = generate_numeral(integer);
+                        
+                        if (numeral == NULL) {
+                                printf(
+                                        ANSI_RED
+                                        "Error. Failed to generate \"%d\" numeral.\n"
+                                        ANSI_RESET,
+                                        integer
+                                );
+                                goto error;
+                        }
+
+                        *top = *numeral;
+                        free(numeral);
+                        
+                        break;
+                }
+
+                top = (Lambda *)stack_pop(stack);
         }
 
+        stack_free(stack);
+        return true;
+
+        error:
+
+        stack_free(stack);
         return false;
 }
 
-bool replace_bind(struct ReplaceParam param)
+Lambda *generate_numeral(int integer)
 {
-        Lambda *lambda = param.lambda;
-        HashTable *table = param.table;
-
-        struct ReplaceParam bind_param = {
-                .lambda = lambda->bind.term,
-                .table = table
+        struct Variable var_f = {
+                .letter = 'f',
+                .subscript = -1
         };
 
-        return replace_recursive(bind_param);
-}
+        struct Variable var_x = {
+                .letter = 'x',
+                .subscript = -1
+        };
 
-bool replace_shortcut(struct ReplaceParam param)
-{
-        Lambda *lambda = param.lambda;
-        HashTable *table = param.table;
+        if (integer < 0)
+                return NULL;
 
-        char *shortcut = lambda->shortcut;
+        Lambda *numeral = malloc(sizeof(*numeral));
 
-        Lambda *binding = hashtable_search(table, shortcut);
+        if (numeral == NULL)
+                return NULL;
 
-        if (binding == NULL) {
-                printf(ANSI_RED "Error. Undefined entry \"%s\".\n" ANSI_RESET, shortcut);
-                return false;
-        }
-                
-        Lambda *duplicate = lambda_duplicate(binding->bind.term);
+        numeral->type = LAMBDA_ABSTRACTION;
+        numeral->variable = var_f;
+        
+        Lambda *inner_abstraction = malloc(sizeof(*inner_abstraction));
+        
+        numeral->body = inner_abstraction;
 
-        if (duplicate == NULL) {
-                printf(ANSI_RED "Error. Duplication fail.\n" ANSI_RESET);
-                return false;
+        if (inner_abstraction == NULL) {
+                free(numeral);
+                return NULL;
         }
 
-        free(shortcut);
+        inner_abstraction->type = LAMBDA_ABSTRACTION;
+        inner_abstraction->variable = var_x;
 
-        *lambda = *duplicate;
+        Lambda *right;
 
-        free(duplicate);
+        // Particular case without function application 0=\f.\x.x
+        if (integer == 0) {
+                right = malloc(sizeof(*right));
 
-        return true;
-}
+                inner_abstraction->body = right;
 
-bool replace_abstraction(struct ReplaceParam param)
-{
-        Lambda *lambda = param.lambda;
-        HashTable *table = param.table;
+                if (right == NULL) {
+                        lambda_free(numeral);
+                        return NULL;
+                }
 
-        struct ReplaceParam abstraction_param = {
-                .lambda = lambda->abstraction.body,
-                .table = table
-        };
+                right->type = LAMBDA_VARIABLE;
+                right->variable = var_x;
 
-        return replace_recursive(abstraction_param);
-}
+                return numeral;
+        }
 
-bool replace_application(struct ReplaceParam param)
-{
-        Lambda *lambda = param.lambda;
-        HashTable *table = param.table;
+        // Generate a chain of applications of the form \f.\x.f(f(...(fx)...))
+        Lambda *outer_application = malloc(sizeof(*outer_application));
+        inner_abstraction->body = outer_application;
 
-        Lambda *left = lambda->application.left;
-        Lambda *right = lambda->application.right;
+        if (outer_application == NULL){
+                lambda_free(numeral);
+                return NULL;
+        }
 
-        struct ReplaceParam left_param = {
-                .lambda = left,
-                .table = table
-        };
+        Lambda *application = outer_application;
 
-        bool left_code = replace_recursive(left_param);
+        for (int k = 0; k < integer; k++) {
+                application->type = LAMBDA_APPLICATION;
 
-        if (!left_code)
-                return false;
+                Lambda *left = malloc(sizeof(*left));
+                right = malloc(sizeof(*right));
 
-        struct ReplaceParam right_param = {
-                .lambda = right,
-                .table = table
-        };
+                application->left = left;
+                application->right = right;
 
-        bool right_code = replace_recursive(right_param);
+                if (left == NULL || right == NULL) {
+                        lambda_free(numeral);
+                        return NULL;
+                }
 
-        return right_code;
+                left->type = LAMBDA_VARIABLE;
+                left->variable = var_f;
+
+                if (k + 1 == integer) {
+                        right->type = LAMBDA_VARIABLE;
+                        right->variable = var_x;
+
+                        application->left = left;
+                        application->right = right;
+                } else {
+                        application->left = left;
+                        application->right = right;
+
+                        application = right;
+                }
+        }
+
+        return numeral;
 }

@@ -10,9 +10,13 @@
 const char space[] = " \t\n\v\f\r";
 
 static void command_help();
-static void command_reduce(Mode *mode, int *iterations);
+static void command_reduce(struct Mode *mode);
 static void command_remove(HashTable *table);
-static int reduce_i();
+
+static void reduce_s(struct Mode *mode, bool strat_parse);
+static void reduce_i(struct Mode *mode, bool steps_parse);
+static void reduce_v(struct Mode *mode, bool verbose_parse);
+static void reduce_enable(struct Mode *mode, char *token, bool enable_parse);
 
 void hello_message()
 {
@@ -25,7 +29,7 @@ void hello_message()
         );
 }
 
-void parse_command(char *str, HashTable *table, Mode *mode, int *iterations)
+void parse_command(char *str, HashTable *table, struct Mode *mode)
 {
         if (str == NULL)
                 return;
@@ -33,15 +37,15 @@ void parse_command(char *str, HashTable *table, Mode *mode, int *iterations)
         char *token = strtok(str, space);
 
         if (strcmp(token, ":exit") == 0)
-                *mode = MODE_EXIT;
+                mode->exit = true;
         else if (strcmp(token, ":help") == 0)
                 command_help();
         else if (strcmp(token, ":entries") == 0)
                 hashtable_print(table);
         else if (strcmp(token, ":remove") == 0)
                 command_remove(table);
-        else if (strcmp(token, ":reduce") == 0)
-                command_reduce(mode, iterations);
+        else if (strcmp(token, ":reduction") == 0)
+                command_reduce(mode);
         else
                 printf(
                         "Invalid command \"%s\".\n"
@@ -58,11 +62,11 @@ void command_help()
                              ANSI_BLUE "https://github.com/victorsavas/lambda-calculus.\n"
                 ANSI_RESET "\n"
                 "Command list:\n"
-                "  :entries                       Prints out all the shortcuts stored.\n"
-                "  :exit                          Terminates the program.\n"
-                "  :help                          Displays this message.\n"
-                "  :remove [ENTRY]                Deletes one term from the table of entries.\n"
-                "  :reduce [OPTION]... [MODE]     Configures reduction iterations.\n"
+                "  :entries                             Prints out all the shortcuts stored.\n"
+                "  :exit                                Terminates the program.\n"
+                "  :help                                Displays this message.\n"
+                "  :remove [ENTRY]                      Deletes one term from the table of entries.\n"
+                "  :reduction [OPTION]... [ENABLE]      Sets up reduction configurations.\n"
                 "\n"
                 "Syntax:\n"
                 "  expression -> variable\n"
@@ -95,84 +99,66 @@ void command_help()
                 "x)\".\n"
                 "\n"
                 "Reduction:\n"
-                "The interpreter has three reduction modes:\n"
-                "  disable: the interpreter simply parses expressions (default);\n"
-                "  normal: the interpreter parses and then reduces expressions;\n"
-                "  verbose: the interpreter parses and reduces expressions, showing all steps.\n"
+                "To enable reduction, type \":reduction on\". Likewise, type \":reduction off\" to"
+                " disable it.\n"
                 "\n"
-                "To change reduction mode, use \":reduce [disable | normal | verbose]\".\n"
+                "This interpreter supports four reduction strategies:\n"
+                "  Normal order (:reduction -s normal)\n"
+                "  Applicative order (:reduction -s applicative)\n"
+                "  Call by value (:reduction -s call-by-value)\n"
+                "  Call by name (:reduction -s call-by-name)\n"
                 "\n"
-                "By default, the interpreter has a limit of 1000 steps of reduction.\n"
-                "Its possible to change that limit using \":reduce -i STEPS\".\n"
-                "\n"
-                "Furthermore, its default reduction strategy is leftmost first.\n"
-                "To change to rightmost first, use \":reduce rightmost\".\n"
+                "To specify recursion max depth, write \":reduction -i [DEPTH]. The default depth is 1000.\n"
+                "To print each reduction step, write \":reduction -v\".\n"
         );
 }
 
-void command_reduce(Mode *mode, int *iterations)
+void command_reduce(struct Mode *mode)
 {
+        bool strat_parse = false;
+        bool steps_parse = false;
+        bool verbose_parse = false;
+        bool enable_parse = false;
+
         const char *space = " \t\n\v\f\r";
         char *token = strtok(NULL, space);
 
         if (token == NULL) {
-                printf(":reduce [rightmost | leftmost] [-i STEPS] [disable | normal | verbose]"
-                        "\n");
+                printf(
+                        ":reduction [-s ORDER] [-i STEPS] [-v] ENABLE\n"
+                        "ORDER: normal, applicative, call-by-value or call-by-name\n"
+                        "STEPS: <integer>\n"
+                        "ENABLE: enabled, disabled\n"
+                );
+
                 return;
         }
-
-        Mode old_mode = *mode;
-        int old_iterations = *iterations;
-
-        Mode rightmost = *mode & MODE_RIGHTMOST;
-        *mode ^= rightmost;
+        
+        struct Mode new_mode = *mode;
+        new_mode.verbose = false;
 
         while (token != NULL) {
-                if (strcmp(token, "disable") == 0) {
-                        *mode = MODE_DISABLE;
-                        printf(ANSI_BLUE "Reduction disabled.\n" ANSI_RESET);
-                } else if (strcmp(token, "normal") == 0) {
-                        *mode = MODE_REDUCE;
-                        printf(ANSI_BLUE "Reducing for normal form.\n" ANSI_RESET);
-                } else if (strcmp(token, "verbose") == 0) {
-                        *mode = MODE_VERBOSE;
-                        printf(ANSI_BLUE "Reducing showing steps.\n" ANSI_RESET);
-                } else if (strcmp(token, "leftmost") == 0)
-                        rightmost = 0;
-                else if (strcmp(token, "rightmost") == 0)
-                        rightmost = MODE_RIGHTMOST;
-                else if (strcmp(token, "-i") == 0) {
-                        int steps = reduce_i();
-
-                        if (steps <= 0) {
-                                *mode = old_mode;
-                                *iterations = old_iterations;
-                                return;
-                        }
-
-                        *iterations = steps;
+                if (strcmp(token, "-s") == 0) {
+                        reduce_s(&new_mode, strat_parse);
+                        strat_parse = true;
+                } else if (strcmp(token, "-i") == 0) {
+                        reduce_i(&new_mode, steps_parse);
+                        steps_parse = true;
+                } else if (strcmp(token, "-v") == 0) {
+                        reduce_v(&new_mode, verbose_parse);
+                        verbose_parse = true;
                 } else {
-                        printf(
-                                ANSI_RED
-                                "Syntax error. Invalid parameter \"%s\".\n"
-                                ANSI_RESET
-                                ":reduce [rightmost | leftmost] [-i STEPS] [disable | normal | ver"
-                                "bose]\n"                           
-                                , token
-                        );
-                        
-                        *mode = old_mode;
-                        *iterations = old_iterations;
-
-                        return;
+                        reduce_enable(&new_mode, token, enable_parse);
+                        enable_parse = true;
                 }
+
+                if (new_mode.exit)
+                        return;
 
                 token = strtok(NULL, space);
         }
 
-        *mode |= rightmost;
-
-        return;
+        *mode = new_mode;
 }
 
 void command_remove(HashTable *table)
@@ -192,8 +178,75 @@ void command_remove(HashTable *table)
                 printf("No \"%s\" entry found.\n", token);
 }
 
-int reduce_i()
+void reduce_s(struct Mode *mode, bool strat_parse)
 {
+        if (strat_parse) {
+                printf(
+                        ANSI_RED
+                        "Error. Duplicate \"-s\" flag.\n"
+                        ANSI_RESET
+                );
+
+                mode->exit = true;
+                return;
+        }
+
+        const char *strat[] = {
+                "normal",
+                "applicative",
+                "call-by-value",
+                "call-by-name"
+        };
+
+        const RedStrat strat_code[] ={
+                STRAT_NORMAL,
+                STRAT_APPLICATIVE,
+                STRAT_CALL_BY_VALUE,
+                STRAT_CALL_BY_NAME
+        };
+
+        char *token = strtok(NULL, space);
+
+        if (token == NULL) {
+                printf(
+                        ANSI_RED
+                        "Syntax error. Expected argument after -s flag.\n"
+                        ANSI_RESET
+                );
+
+                mode->exit = true;
+                return;
+        }
+
+        for (int i = 0; i < 4; i++)
+                if (strcmp(token, strat[i]) == 0) {
+                        mode->strat = strat_code[i];
+                        return;
+                }
+
+        printf(
+                ANSI_RED
+                "Syntax error. Undefined reduction strategy \"-s %s\".\n"
+                ANSI_RESET,
+                token
+        );
+
+        mode->exit = true;
+}
+
+void reduce_i(struct Mode *mode, bool steps_parse)
+{
+        if (steps_parse) {
+                printf(
+                        ANSI_RED
+                        "Error. Duplicate \"-i\" flag.\n"
+                        ANSI_RESET
+                );
+
+                mode->exit = true;
+                return;
+        }
+
         char *token = strtok(NULL, space);
 
         if (token == NULL) {
@@ -203,7 +256,9 @@ int reduce_i()
                         ANSI_RESET
                         ":reduce -i [STEPS]\n"
                 );
-                return 0;
+
+                mode->exit = true;
+                return;
         }
 
         if (!isdigit(token[0])) {
@@ -215,12 +270,14 @@ int reduce_i()
                         ":reduce -i [STEPS]\n",
                         token
                 );
-                return 0;
+
+                mode->exit = true;
+                return;
         }
 
-        int steps = atoi(token);
+        int depth = atoi(token);
 
-        if (steps <= 0) {
+        if (depth <= 0) {
                 printf(
                         ANSI_RED
                         "Syntax error. Reduction steps number \"steps\" must be "
@@ -228,8 +285,65 @@ int reduce_i()
                         ANSI_RESET
                         ":reduce -i [STEPS]\n"
                 );
-                return 0;
+                
+                mode->exit = true;
+                return;
         }
 
-        return steps;
+        mode->depth = depth;
+}
+
+void reduce_v(struct Mode *mode, bool verbose_parse)
+{
+        if (verbose_parse) {
+                printf(
+                        ANSI_RED
+                        "Error. Duplicate \"-v\" flag.\n"
+                        ANSI_RESET
+                );
+
+                mode->exit = true;
+                return;
+        }
+
+        mode->verbose = true;
+}
+
+void reduce_enable(struct Mode *mode, char *token, bool enable_parse)
+{
+        if (enable_parse) {
+                printf(
+                        ANSI_RED
+                        "Error. Invalid token \"%s\".\n"
+                        ANSI_RESET,
+                        token
+                );
+
+                mode->exit = true;
+                return;
+        }
+
+        const char *enable[] = {
+                "on",
+                "off"
+        };
+
+        if (strcmp(token, enable[0]) == 0) {
+                mode->reduction_enabled = true;
+                return;
+        }
+        
+        if (strcmp(token, enable[1]) == 0) {
+                mode->reduction_enabled = false;
+                return;
+        }
+        
+        printf(
+                ANSI_RED
+                "Syntax error. Invalid token \"%s\".\n"
+                ANSI_RESET,
+                token
+        );
+
+        mode->exit = true;
 }

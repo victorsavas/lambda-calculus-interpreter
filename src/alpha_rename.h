@@ -2,4 +2,4 @@
 
 #include "parsing.h"
 
-void alpha_rename(Lambda *capture, Lambda *application);
+void alpha_rename(Lambda *capture, Lambda *redex);

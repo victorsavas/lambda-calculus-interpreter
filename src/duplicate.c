@@ -2,143 +2,93 @@
 #include <string.h>
 
 #include "duplicate.h"
+#include "stack.h"
 
-static Lambda *duplicate_bind(Lambda *lambda);
-static Lambda *duplicate_variable(Lambda *lambda);
-static Lambda *duplicate_shortcut(Lambda *lambda);
-static Lambda *duplicate_abstraction(Lambda *lambda);
-static Lambda *duplicate_application(Lambda *lambda);
-
-Lambda *lambda_duplicate(Lambda *lambda)
+Lambda *lambda_duplicate(const Lambda *lambda)
 {
         if (lambda == NULL)
                 return NULL;
 
-        switch (lambda->type) {
-        case LAMBDA_BIND:
-                return duplicate_bind(lambda);
+        Stack *src_stack = stack_init();
+        Stack *dest_stack = stack_init();
 
-        case LAMBDA_VARIABLE:
-                return duplicate_variable(lambda);
+        Lambda *dup = calloc(1, sizeof(*dup));
 
-        case LAMBDA_SHORTCUT:
-                return duplicate_shortcut(lambda);
-
-        case LAMBDA_ABSTRACTION:
-                return duplicate_abstraction(lambda);
-
-        case LAMBDA_APPLICATION:
-                return duplicate_application(lambda);
-        }
-
-        return NULL;
-}
-
-Lambda *duplicate_bind(Lambda *lambda)
-{
-        Lambda *duplicate = malloc(sizeof(*duplicate));
-        
-        if (duplicate == NULL)
-                return NULL;
-
-        char *shortcut = my_strdup(lambda->bind.shortcut);
-
-        if (shortcut == NULL) {
-                free(duplicate);
+        if (src_stack == NULL || dest_stack == NULL || dup == NULL) {
+                stack_free(src_stack);
+                stack_free(dest_stack);
+                free(dup);
                 return NULL;
         }
 
-        Lambda *term = lambda_duplicate(lambda->bind.term);
+        Lambda *src_top = (Lambda *)lambda;
+        Lambda *dest_top = dup;
 
-        if (term == NULL) {
-                free(duplicate);
-                free(shortcut);
-                return NULL;
+        while (src_top != NULL) {
+                Lambda *left;
+                Lambda *right;
+
+                dest_top->type = src_top->type;
+
+                switch (src_top->type) {
+                case LAMBDA_ENTRY:
+                        right = calloc(1, sizeof(*right));
+
+                        dest_top->entry = my_strdup(src_top->entry);
+                        dest_top->term = right;
+
+                        stack_push(src_stack, src_top->term);
+                        stack_push(dest_stack, right);
+
+                        break;
+
+                case LAMBDA_SHORTCUT:
+                        dest_top->shortcut = my_strdup(src_top->shortcut);
+                        break;
+
+                case LAMBDA_VARIABLE:
+                        dest_top->variable = src_top->variable;
+                        break;
+
+                case LAMBDA_ABSTRACTION:
+                        right = calloc(1, sizeof(*right));
+
+                        dest_top->variable = src_top->variable;
+                        dest_top->body = right;
+
+                        stack_push(src_stack, src_top->body);
+                        stack_push(dest_stack, right);
+
+                        break;
+
+                case LAMBDA_APPLICATION:
+                        right = malloc(sizeof(*right));
+                        left = malloc(sizeof(*left));
+
+                        dest_top->right = right;
+                        dest_top->left = left;
+
+                        stack_push(src_stack, src_top->right);
+                        stack_push(src_stack, src_top->left);
+
+                        stack_push(dest_stack, right);
+                        stack_push(dest_stack, left);
+
+                        break;
+                
+                case LAMBDA_NUMERAL:
+                        dest_top->numeral = src_top->numeral;
+                        break;
+                }
+
+                src_top = (Lambda *)stack_pop(src_stack);
+                dest_top = (Lambda *)stack_pop(dest_stack);
         }
 
-        duplicate->type = LAMBDA_BIND;
-        duplicate->bind.shortcut = shortcut;
-        duplicate->bind.term = term;
+        stack_free(src_stack);
+        stack_free(dest_stack);
 
-        return duplicate;
-}
-
-Lambda *duplicate_variable(Lambda *lambda)
-{
-        Lambda *duplicate = malloc(sizeof(*duplicate));
-
-        if (duplicate == NULL)
-                return NULL;
-
-        duplicate->type = LAMBDA_VARIABLE;
-        duplicate->variable = lambda->variable;
-
-        return duplicate;
-}
-
-Lambda *duplicate_shortcut(Lambda *lambda)
-{
-        Lambda *duplicate = malloc(sizeof(*duplicate));
-
-        if (duplicate == NULL)
-                return NULL;
-
-        char *shortcut = my_strdup(lambda->shortcut);
-
-        duplicate->type = LAMBDA_SHORTCUT;
-        duplicate->shortcut = shortcut;
-
-        return duplicate;
-}
-
-Lambda *duplicate_abstraction(Lambda *lambda)
-{
-        Lambda *duplicate = malloc(sizeof(*duplicate));
-        
-        if (duplicate == NULL)
-                return NULL;
-
-        Lambda *body = lambda_duplicate(lambda->abstraction.body);
-
-        if (body == NULL) {
-                free(duplicate);
-                return NULL;
-        }
-
-        duplicate->type = LAMBDA_ABSTRACTION;
-        duplicate->abstraction.binding = lambda->abstraction.binding;
-        duplicate->abstraction.body = body;
-
-        return duplicate;
-}
-
-Lambda *duplicate_application(Lambda *lambda)
-{
-        Lambda *duplicate = malloc(sizeof(*duplicate));
-        
-        if (duplicate == NULL)
-                return NULL;
-
-        Lambda *left = lambda_duplicate(lambda->application.left);
-
-        if (left == NULL) {
-                free(duplicate);
-                return NULL;
-        }
-
-        Lambda *right = lambda_duplicate(lambda->application.right);
-
-        if (right == NULL) {
-                lambda_free(left);
-                free(duplicate);
-                return NULL;
-        }
-
-        duplicate->type = LAMBDA_APPLICATION;
-        duplicate->application.left = left;
-        duplicate->application.right = right;
-
-        return duplicate;
+        return dup;
 }
 
 char *my_strdup(char *str)

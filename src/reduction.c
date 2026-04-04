@@ -1,54 +1,49 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "alpha_rename.h"
 #include "ansi_escapes.h"
 #include "duplicate.h"
 #include "printing.h"
 #include "reduction.h"
+#include "stack.h"
 #include "variable.h"
 #include "variable_capture.h"
 
 #define LONG_CYCLE 10000
 
-struct ReductionParam {
-        Lambda *lambda;
-        struct Variable binding;
-        Lambda *right;
-};
+static bool is_redex(Lambda *lambda);
 
-static Lambda *get_leftmost(Lambda *lambda);
-static Lambda *get_rightmost(Lambda *lambda);
+static Lambda *get_redex_normal(Lambda *lambda);
+// static Lambda *get_redex_applicative(Lambda *lambda);
+// static Lambda *get_redex_cb_name(Lambda *lambda);
+// static Lambda *get_redex_cb_value(Lambda *lambda);
 
-static void beta_reduction(Lambda *application);
-static void beta_reduction_recursive(struct ReductionParam param);
+static void beta_reduction(Lambda *redex);
 
-static void reduce_variable(struct ReductionParam param);
-static void reduce_abstraction(struct ReductionParam param);
-static void reduce_application(struct ReductionParam param);
-
-bool lambda_is_normal(Lambda *lambda)
+bool lambda_normal(Lambda *lambda)
 {
         if (lambda == NULL)
                 return false;
 
-        Lambda *application = get_leftmost(lambda);
+        Lambda *redex = get_redex_normal(lambda);
 
-        return application == NULL;
+        return redex == NULL;
 }
 
-Lambda *lambda_reduce(Lambda *lambda, Mode mode, unsigned iterations)
+Lambda *lambda_reduce(Lambda *lambda, struct Mode mode)
 {
         if (lambda == NULL)
                 return NULL;
-        
-        bool normal_form = false;
 
-        if (!(mode & (MODE_REDUCE | MODE_VERBOSE))) {
+        bool normal_form;
+
+        if (!mode.reduction_enabled) {
                 lambda_print(lambda, NULL);
-                
-                normal_form = lambda_is_normal(lambda);
+
+                normal_form = lambda_normal(lambda);
 
                 if (normal_form)
                         printf(ANSI_BLUE " (Normal form.)\n" ANSI_RESET);
@@ -58,35 +53,55 @@ Lambda *lambda_reduce(Lambda *lambda, Mode mode, unsigned iterations)
                 return lambda;
         }
 
-        unsigned i;
-        
-        for (i = 0; i < iterations; i++) {
-                Lambda *application;
+        normal_form = false;
 
-                if (mode & MODE_RIGHTMOST)
-                        application = get_rightmost(lambda);
-                else
-                        application = get_leftmost(lambda);
+        unsigned int i;
 
-                if (application == NULL) {
+        for (i = 0; i < mode.depth; i++) {
+                Lambda *redex = NULL;
+
+                /*
+                switch (mode.strat) {
+                case STRAT_NORMAL:
+                        redex = get_redex_normal(lambda);
+                        break;
+
+                case STRAT_APPLICATIVE:
+                        redex = get_redex_applicative(lambda);
+                        break;
+
+                case STRAT_CALL_BY_NAME:
+                        redex = get_redex_cb_name(lambda);
+                        break;
+
+                case STRAT_CALL_BY_VALUE:
+                        redex = get_redex_cb_value(lambda);
+                        break;
+                }
+
+                */
+
+                redex = get_redex_normal(lambda);
+
+                if (redex == NULL) {
                         normal_form = true;
                         break;
                 }
 
-                if (mode & MODE_VERBOSE) {
+                if (mode.verbose) {
                         printf(ANSI_BLUE "%-5u " ANSI_RESET, i + 1);
-                        lambda_print(lambda, application);
+                        lambda_print(lambda, redex);
                         printf("\n");
-                } else if ((i + 1) % LONG_CYCLE == 0)
+                } else if ((i + 1) % LONG_CYCLE == 0) {
                         printf(".\n");
+                }
 
-                // Tests for variable capture
-                Lambda *capture = variable_capture(application);
+                Lambda *capture = variable_capture(redex);
 
                 if (capture == NULL)
-                        beta_reduction(application);
+                        beta_reduction(redex);
                 else
-                        alpha_rename(capture, application);
+                        alpha_rename(capture, redex);
         }
 
         lambda_print(lambda, NULL);
@@ -99,209 +114,155 @@ Lambda *lambda_reduce(Lambda *lambda, Mode mode, unsigned iterations)
         return lambda;
 }
 
-void beta_reduction(Lambda *application)
+void beta_reduction(Lambda *redex)
 {
-        if (application == NULL)
+        if (redex == NULL)
                 return;
 
-        if (application->type != LAMBDA_APPLICATION)
+        if (!is_redex(redex))
                 return;
 
-        Lambda *left = application->application.left;
-        Lambda *right = application->application.right;
+        Stack *stack = stack_init();
 
-        if (left->type != LAMBDA_ABSTRACTION)
+        if (stack == NULL)
                 return;
 
-        struct Variable binding = left->abstraction.binding;
-        Lambda *body = left->abstraction.body;
+        Lambda *left = redex->left;
+        Lambda *argument = redex->right;
 
-        struct ReductionParam param = {
-                .lambda = body,
-                .binding = binding,
-                .right = right
-        };
+        Lambda *body = left->body;
 
-        beta_reduction_recursive(param);
+        struct Variable bound_var = left->variable;
 
-        lambda_free(right);
+        free(left);
 
-        *application = *body;
-        free(body);
-}
+        Lambda *top = body;
 
-void beta_reduction_recursive(struct ReductionParam param)
-{
-        Lambda *lambda = param.lambda;
-        struct Variable binding = param.binding;
-        Lambda *right = param.right;
-
-        if (lambda == NULL || right == NULL)
-                return;
-
-        switch (lambda->type) {
-        case LAMBDA_VARIABLE:
-                reduce_variable(param);
-                break;
-
-        case LAMBDA_ABSTRACTION:
-                reduce_abstraction(param);
-                break;
-
-        case LAMBDA_APPLICATION:
-                reduce_application(param);
-                break;
-        }
-}
-
-void reduce_variable(struct ReductionParam param)
-{
-        Lambda *lambda = param.lambda;
-        struct Variable binding = param.binding;
-        Lambda *right = param.right;
-
-        struct Variable variable = lambda->variable;
-                
-        if (!variable_compare(variable, binding))
-                return;
-
-        Lambda *duplicate = lambda_duplicate(right);
-
-        if (duplicate == NULL)
-                return;
-
-        *lambda = *duplicate;
-
-        free(duplicate);
-}
-
-void reduce_abstraction(struct ReductionParam param)
-{
-        Lambda *lambda = param.lambda;
-        struct Variable binding = param.binding;
-        struct Variable variable = lambda->abstraction.binding;
-
-        if (variable_compare(binding, variable))
-                return;
-
-        struct ReductionParam body_param = {
-                .lambda = lambda->abstraction.body,
-                .binding = binding,
-                .right = param.right
-        };
-
-        beta_reduction_recursive(body_param);
-}
-
-void reduce_application(struct ReductionParam param)
-{
-        Lambda *lambda = param.lambda;
-        struct Variable binding = param.binding;
-        Lambda *right = param.right;
-
-        struct ReductionParam left_param = {
-                .lambda = lambda->application.left,
-                .binding = binding,
-                .right = right
-        };
-
-        beta_reduction_recursive(left_param);
-
-        struct ReductionParam right_param = {
-                .lambda = lambda->application.right,
-                .binding = binding,
-                .right = right
-        };
-
-        beta_reduction_recursive(right_param);
-}
-
-Lambda *get_leftmost(Lambda *lambda)
-{
-        if (lambda == NULL)
-                return NULL;
-
-        Lambda *leftmost = lambda;
-
-        while (1) {
-                switch (leftmost->type) {
-                case LAMBDA_BIND:
-                        leftmost = leftmost->bind.term;
-                        continue;
-                
+        while (top != NULL) {
+                switch (top->type) {
+                case LAMBDA_ENTRY:
                 case LAMBDA_SHORTCUT:
+                        // illegal
+                        stack_free(stack);
+                        return;
+
                 case LAMBDA_VARIABLE:
-                        return NULL;
+                        struct Variable var = top->variable;
 
-                case LAMBDA_ABSTRACTION:
-                        leftmost = leftmost->abstraction.body;
-                        continue;
+                        if (!variable_compare(var, bound_var))
+                                break;
 
-                case LAMBDA_APPLICATION:
-                        Lambda *left = leftmost->application.left;
-                        Lambda *right = leftmost->application.right;
+                        Lambda *dup = lambda_duplicate(argument);
 
-                        if (left == NULL || right == NULL)
-                                return NULL;
+                        *top = *dup;
+                        free(dup);
 
-                        if (left->type == LAMBDA_ABSTRACTION)
-                                return leftmost;
-
-                        Lambda *left_reduction = get_leftmost(left);
-
-                        if (left_reduction != NULL)
-                                return left_reduction;
-
-                        leftmost = right;
-
-                        continue;
-                }
-        }
-
-        return NULL;
-}
-
-Lambda *get_rightmost(Lambda *lambda)
-{
-        if (lambda == NULL)
-                return NULL;
-
-        Lambda *rightmost = lambda;
-
-        while (1) {
-                switch (rightmost->type) {
-                case LAMBDA_BIND:
-                        rightmost = rightmost->bind.term;
-                        continue;
-
-                case LAMBDA_SHORTCUT:
-                case LAMBDA_VARIABLE:
-                        return NULL;
-
-                case LAMBDA_ABSTRACTION:
-                        rightmost = rightmost->abstraction.body;
-                        continue;
-
-                case LAMBDA_APPLICATION:
-                        Lambda *left = rightmost->application.left;
-                        Lambda *right = rightmost->application.right;
-
-                        if (left == NULL || right == NULL)
-                                return NULL;
-
-                        Lambda *right_reduction = get_rightmost(right);
-
-                        if (right_reduction != NULL)
-                                return right_reduction;
-
-                        if (left->type == LAMBDA_ABSTRACTION)
-                                return rightmost;
+                        break;
                         
-                        rightmost = left;
+                case LAMBDA_ABSTRACTION:
+                        var = top->variable;
 
-                        continue;
+                        if (variable_compare(var, bound_var))
+                                break;
+
+                        Lambda *body = top->body;
+                        stack_push(stack, body);
+
+                        break;
+
+                case LAMBDA_APPLICATION:
+                        Lambda *right = top->right;
+                        Lambda *left = top->left;
+
+                        stack_push(stack, right);
+                        stack_push(stack, left);
+
+                        break;
+
+                case LAMBDA_NUMERAL:
+                        break;
                 }
+
+                top = (Lambda *)stack_pop(stack);
         }
 
+        lambda_free(argument);
+        *redex = *body;
+        free(body);
+
+        stack_free(stack);
+}
+
+Lambda *get_redex_normal(Lambda *lambda)
+{
+        if (lambda == NULL)
+                return NULL;
+
+        Stack *stack = stack_init();
+
+        if (stack == NULL)
+                return NULL;
+
+        Lambda *top = lambda;
+
+        while (top != NULL) {
+                switch (top->type) {
+                case LAMBDA_ENTRY:
+                        Lambda *entry = top->term;
+                        stack_push(stack, entry);
+
+                        break;
+
+                case LAMBDA_SHORTCUT:
+                        break;
+
+                case LAMBDA_VARIABLE:
+                        break;
+                        
+                case LAMBDA_ABSTRACTION:
+                        Lambda *body = top->body;
+                        stack_push(stack, body);
+
+                        break;
+
+                case LAMBDA_APPLICATION:
+                        if (is_redex(top)) {
+                                stack_free(stack);
+                                return top;
+                        }
+
+                        Lambda *right = top->right;
+                        Lambda *left = top->left;
+
+                        stack_push(stack, right);
+                        stack_push(stack, left);
+
+                        break;
+
+                case LAMBDA_NUMERAL:
+                        break;
+                }
+
+                top = (Lambda *)stack_pop(stack);
+        }
+
+        stack_free(stack);
+
         return NULL;
+}
+
+bool is_redex(Lambda *lambda)
+{
+        if (lambda == NULL)
+                return false;
+
+        if (lambda->type != LAMBDA_APPLICATION)
+                return false;
+
+        Lambda *left = lambda->left;
+
+        if (left == NULL)
+                return false;
+
+        return left->type == LAMBDA_ABSTRACTION;
 }

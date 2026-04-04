@@ -2,7 +2,7 @@
 
 #include "stack.h"
 
-#define STACK_CAP 16
+#define STACK_CAP 32
 
 struct Stack {
         const void **array;

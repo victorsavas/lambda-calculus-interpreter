@@ -5,5 +5,5 @@
 #include "commands.h"
 #include "parsing.h"
 
-bool lambda_is_normal(Lambda *lambda);
-Lambda *lambda_reduce(Lambda *lambda, Mode mode, unsigned iterations);
+bool lambda_normal(Lambda *lambda);
+Lambda *lambda_reduce(Lambda *lambda, struct Mode mode);

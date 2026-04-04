@@ -60,11 +60,11 @@ Lambda *hashtable_insert(HashTable *table, Lambda *lambda)
         if (table == NULL || lambda == NULL)
                 return NULL;
 
-        if (lambda->type != LAMBDA_BIND)
+        if (lambda->type != LAMBDA_ENTRY)
                 return NULL;
 
-        const char *insert_name = lambda->bind.shortcut;
-        uint32_t hash = hash_function(insert_name);
+        const char *entry = lambda->entry;
+        uint32_t hash = hash_function(entry);
         size_t index = hash % BUCKET_COUNT;
 
         Node *bucket = &table->buckets[index];
@@ -78,8 +78,9 @@ Lambda *hashtable_insert(HashTable *table, Lambda *lambda)
         Node *node = bucket;
 
         while (node != NULL) {
-                const char *node_name = node->value->bind.shortcut;
-                if (strcmp(insert_name, node_name) == 0) {
+                const char *node_entry = node->value->entry;
+
+                if (strcmp(entry, node_entry) == 0) {
                         lambda_free(node->value);
                         node->value = lambda;
                         return lambda;
@@ -117,7 +118,7 @@ Lambda *hashtable_search(HashTable *table, const char *key)
         if (node->value == NULL)
                 return NULL;
 
-        while (strcmp(node->value->bind.shortcut, key) != 0) {
+        while (strcmp(node->value->entry, key) != 0) {
                 node = node->next;
 
                 if (node == NULL)
@@ -142,7 +143,7 @@ Lambda *hashtable_delete(HashTable *table, const char *key)
 
         Node *prev = NULL;
 
-        while (strcmp(node->value->bind.shortcut, key) != 0) {
+        while (strcmp(node->value->entry, key) != 0) {
                 prev = node;
                 node = node->next;
 
@@ -207,10 +208,10 @@ void hashtable_print(HashTable *table)
         qsort(array, entries_count, sizeof(*array), compare_entries);
 
         for (i = 0; i < entries_count; i++) {
-                printf(ANSI_BLUE "%-4d " ANSI_RESET, i + 1);
+                printf(ANSI_BLUE "%-4ldd " ANSI_RESET, i + 1);
                 
-                char *shortcut = array[i]->bind.shortcut;
-                Lambda *term = array[i]->bind.term;
+                char *shortcut = array[i]->shortcut;
+                Lambda *term = array[i]->term;
 
                 printf("%-8s " ANSI_GREEN, shortcut);
 
@@ -325,8 +326,8 @@ int compare_entries(const void *left, const void *right)
         Lambda *l_left = *(Lambda **)left;
         Lambda *l_right = *(Lambda **)right;
 
-        char *str_left = l_left->shortcut;
-        char *str_right = l_right->shortcut;
+        char *str_left = l_left->entry;
+        char *str_right = l_right->entry;
 
         return strcmp(str_left, str_right);
 }

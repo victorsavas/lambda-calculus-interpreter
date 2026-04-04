@@ -1,5 +1,6 @@
 #include <ctype.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -19,18 +20,23 @@ int main()
         HashTable *table = hashtable_init();
         char buffer[BUF_LEN];
 
-        Mode mode = MODE_DISABLE;
-        int iterations = 1000;
+        struct Mode mode = {
+                .exit = false,
+                .reduction_enabled = false,
+                .verbose = false,
+                .strat = STRAT_NORMAL,
+                .depth = 1000
+        };
 
         hello_message();
 
-        while (mode != MODE_EXIT) {
+        while (!mode.exit) {
                 printf("λ> ");
 
                 fgets_wrapper(buffer, BUF_LEN, stdin);
                 
                 if (buffer[0] == ':') {
-                        parse_command(buffer, table, &mode, &iterations);
+                        parse_command(buffer, table, &mode);
                         continue;
                 }
 
@@ -47,7 +53,7 @@ int main()
                         continue;
                 }
                 
-                lambda_reduce(lambda, mode, iterations);
+                lambda_reduce(lambda, mode);
 
                 if (!hashtable_insert(table, lambda))
                         lambda_free(lambda);

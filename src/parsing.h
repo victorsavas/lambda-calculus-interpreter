@@ -3,11 +3,12 @@
 #include "variable.h"
 
 typedef enum LambdaExprType {
-        LAMBDA_BIND,
+        LAMBDA_ENTRY,
         LAMBDA_SHORTCUT,
         LAMBDA_VARIABLE,
         LAMBDA_ABSTRACTION,
-        LAMBDA_APPLICATION
+        LAMBDA_APPLICATION,
+        LAMBDA_NUMERAL
 } LambdaExprType;
 
 typedef struct Lambda Lambda;
@@ -16,25 +17,17 @@ struct Lambda {
         LambdaExprType type;
 
         union {
-                struct {
-                        char *shortcut;
-                        Lambda *term;
-                } bind;
-
+                char *entry;
                 char *shortcut;
-
                 struct Variable variable;
+                Lambda *left;
+                int numeral;
+        };
 
-                struct {
-                        struct Variable binding;
-                        Lambda *body;
-                } abstraction;
-
-                struct {
-                        Lambda *left;
-                        Lambda *right;
-                } application;
-                
+        union {
+                Lambda *term;
+                Lambda *body;
+                Lambda *right;
         };
 };
 

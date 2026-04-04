@@ -2,5 +2,5 @@
 
 #include "parsing.h"
 
-Lambda *lambda_duplicate(Lambda *lambda);
+Lambda *lambda_duplicate(const Lambda *lambda);
 char *my_strdup(char *str);

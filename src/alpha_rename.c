@@ -32,12 +32,12 @@ static void rename_variable(struct RenameParam param);
 static void rename_abstraction(struct RenameParam param);
 static void rename_application(struct RenameParam param);
 
-void alpha_rename(Lambda *capture, Lambda *application)
+void alpha_rename(Lambda *capture, Lambda *redex)
 {
-        if (capture == NULL || application == NULL)
+        if (capture == NULL || redex == NULL)
                 return;
 
-        Stack *right_fv = get_free_variables(application->application.right);
+        Stack *right_fv = get_free_variables(redex->right);
         Stack *inner_binds = get_inner_binds(capture);
 
         if (right_fv == NULL || inner_binds == NULL) {
@@ -45,7 +45,7 @@ void alpha_rename(Lambda *capture, Lambda *application)
                 stack_free(inner_binds);
         }
 
-        struct Variable old_variable = capture->abstraction.binding;
+        struct Variable old_variable = capture->variable;
 
         struct Variable new_variable = {
                 .letter = old_variable.letter,
@@ -64,14 +64,14 @@ void alpha_rename(Lambda *capture, Lambda *application)
                 return;
 
         struct RenameParam param = {
-                .lambda = capture->abstraction.body,
+                .lambda = capture->body,
                 .old_bind = old_variable,
                 .new_bind = new_variable
         };
 
         rename_recursive(param);
 
-        capture->abstraction.binding = new_variable;
+        capture->variable = new_variable;
 
         stack_free(right_fv);
         stack_free(inner_binds);
@@ -85,7 +85,7 @@ void rename_recursive(struct RenameParam param)
                 return;
 
         switch (lambda->type) {
-        case LAMBDA_BIND:
+        case LAMBDA_ENTRY:
                 break;
         
         case LAMBDA_SHORTCUT:
@@ -119,9 +119,9 @@ Stack *get_inner_binds(Lambda *lambda)
                 return NULL;
 
         struct BindsParam param = {
-                .lambda = lambda->abstraction.body,
+                .lambda = lambda->body,
                 .inner_binds = inner_binds,
-                .old_bind = lambda->abstraction.binding
+                .old_bind = lambda->variable
         };
 
         get_binds_recursive(param);
@@ -145,9 +145,9 @@ void rename_abstraction(struct RenameParam param)
         struct Variable old_bind = param.old_bind;
         struct Variable new_bind = param.new_bind;
 
-        if (!variable_compare(lambda->abstraction.binding, old_bind)) {
+        if (!variable_compare(lambda->variable, old_bind)) {
                 struct RenameParam param = {
-                        .lambda = lambda->abstraction.body,
+                        .lambda = lambda->body,
                         .old_bind = old_bind,
                         .new_bind = new_bind
                 };
@@ -163,13 +163,13 @@ void rename_application(struct RenameParam param)
         struct Variable new_bind = param.new_bind;
 
         struct RenameParam left_param = {
-                .lambda = lambda->application.left,
+                .lambda = lambda->left,
                 .old_bind = old_bind,
                 .new_bind = new_bind
         };
 
         struct RenameParam right_param = {
-                .lambda = lambda->application.right,
+                .lambda = lambda->right,
                 .old_bind = old_bind,
                 .new_bind = new_bind
         };
@@ -187,7 +187,7 @@ void get_binds_recursive(struct BindsParam param)
         case LAMBDA_SHORTCUT:
                 break;
 
-        case LAMBDA_BIND:
+        case LAMBDA_ENTRY:
                 break;
 
         case LAMBDA_VARIABLE:
@@ -224,7 +224,7 @@ void get_binds_abstraction(struct BindsParam param)
         Stack *inner_binds = param.inner_binds;
         struct Variable old_bind = param.old_bind;
 
-        struct Variable *variable = &lambda->abstraction.binding;
+        struct Variable *variable = &lambda->variable;
 
         if (!variable_compare(old_bind, *variable)
          && !stack_search(inner_binds, variable, variable_search)) {
@@ -239,13 +239,13 @@ void get_binds_application(struct BindsParam param)
         struct Variable old_bind = param.old_bind;
         
         struct BindsParam left_param = {
-                .lambda = lambda->application.left,
+                .lambda = lambda->left,
                 .inner_binds = inner_binds,
                 .old_bind = old_bind
         };
 
         struct BindsParam right_param = {
-                .lambda = lambda->application.right,
+                .lambda = lambda->right,
                 .inner_binds = inner_binds,
                 .old_bind = old_bind
         };

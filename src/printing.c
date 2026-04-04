@@ -45,17 +45,16 @@ void lambda_print(const Lambda *lambda, const Lambda *highlight)
                 return;
         }
 
-        stack_push(lambda_stack, lambda);
         stack_push(operator_stack, operator_table[OPERATOR_EMPTY]);
 
-        const Lambda *lambda_top = stack_pop(lambda_stack);
+        const Lambda *lambda_top = lambda;
         const char *operator_top = NULL;
 
         while (lambda_top != NULL) {
                 switch (lambda_top->type) {
-                case LAMBDA_BIND:
-                        printf("%s", lambda->bind.shortcut);
-                        stack_push(lambda_stack, lambda_top->bind.term);
+                case LAMBDA_ENTRY:
+                        printf("%s", lambda->shortcut);
+                        stack_push(lambda_stack, lambda_top->term);
                         stack_push(operator_stack, operator_table[OPERATOR_EQUALS]);
                         break;
 
@@ -72,20 +71,20 @@ void lambda_print(const Lambda *lambda, const Lambda *highlight)
                         break;
                 
                 case LAMBDA_ABSTRACTION:
-                        struct Variable binding = lambda_top->abstraction.binding;
+                        variable = lambda_top->variable;
                         
-                        printf(operator_table[OPERATOR_LAMBDA]);
+                        printf("%s", operator_table[OPERATOR_LAMBDA]);
 
-                        variable_print(binding);
+                        variable_print(variable);
 
-                        stack_push(lambda_stack, lambda_top->abstraction.body);
+                        stack_push(lambda_stack, lambda_top->body);
                         stack_push(operator_stack, operator_table[OPERATOR_DOT]);
 
                         break;
 
                 case LAMBDA_APPLICATION:
-                        Lambda *left = lambda_top->application.left;
-                        Lambda *right = lambda_top->application.right;
+                        Lambda *left = lambda_top->left;
+                        Lambda *right = lambda_top->right;
 
                         stack_push(lambda_stack, right);
                         stack_push(lambda_stack, left);

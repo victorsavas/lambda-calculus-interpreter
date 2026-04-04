@@ -31,8 +31,8 @@ Lambda *variable_capture(Lambda *application)
         if (application->type != LAMBDA_APPLICATION)
                 return NULL;
 
-        Lambda *left = application->application.left;
-        Lambda *right = application->application.right;
+        Lambda *left = application->left;
+        Lambda *right = application->right;
 
         if (left->type != LAMBDA_ABSTRACTION)
                 return NULL;
@@ -42,8 +42,10 @@ Lambda *variable_capture(Lambda *application)
         if (right_fv == NULL)
                 return NULL;
 
-        if (stack_peek(right_fv) == NULL)
+        if (stack_peek(right_fv) == NULL){
+                stack_free(right_fv);
                 return NULL;
+        }
 
         Stack *left_binds = stack_init();
 
@@ -89,6 +91,8 @@ Stack *get_free_variables(Lambda *lambda)
 
         get_fv_recursive(param);
 
+        stack_free(bound_variables);
+
         return free_variables;
 }
 
@@ -100,7 +104,7 @@ Lambda *capture_check(struct CaptureParam param)
                 return NULL;
 
         switch (lambda->type) {
-        case LAMBDA_BIND:
+        case LAMBDA_ENTRY:
                 return NULL;
 
         case LAMBDA_SHORTCUT:
@@ -125,7 +129,7 @@ Lambda *abstraction_check(struct CaptureParam param)
         Stack *free_variables = param.free_variables;
         Stack *bound_variables = param.bound_variables;
 
-        struct Variable *binding = &lambda->abstraction.binding;
+        struct Variable *binding = &lambda->variable;
 
         bool capture = stack_search(free_variables, binding, variable_search);
 
@@ -135,7 +139,7 @@ Lambda *abstraction_check(struct CaptureParam param)
         stack_push(bound_variables, binding);
 
         struct CaptureParam body_param = {
-                .lambda = lambda->abstraction.body,
+                .lambda = lambda->body,
                 .free_variables = free_variables,
                 .bound_variables = bound_variables
         };
@@ -153,8 +157,8 @@ Lambda *application_check(struct CaptureParam param)
         Stack *free_variables = param.free_variables;
         Stack *bound_variables = param.bound_variables;
 
-        Lambda *left = lambda->application.left;
-        Lambda *right = lambda->application.right;
+        Lambda *left = lambda->left;
+        Lambda *right = lambda->right;
 
         struct CaptureParam left_param = {
                 .lambda = left,
@@ -198,7 +202,7 @@ void get_fv_recursive(struct CaptureParam param)
                 get_fv_application(param);
                 break;
                 
-        case LAMBDA_BIND:
+        case LAMBDA_ENTRY:
                 get_fv_bind(param);
                 break;
         }
@@ -223,12 +227,12 @@ void get_fv_abstraction(struct CaptureParam param)
         Stack *free_variables = param.free_variables;
         Stack *bound_variables = param.bound_variables;
 
-        struct Variable *variable = &lambda->abstraction.binding;
+        struct Variable *variable = &lambda->variable;
 
         stack_push(bound_variables, variable);
 
         struct CaptureParam abstraction_param = {
-                .lambda = lambda->abstraction.body,
+                .lambda = lambda->body,
                 .free_variables = free_variables,
                 .bound_variables = bound_variables
         };
@@ -245,7 +249,7 @@ void get_fv_application(struct CaptureParam param)
         Stack *bound_variables = param.bound_variables;
 
         struct CaptureParam left_param = {
-                .lambda = lambda->application.left,
+                .lambda = lambda->left,
                 .free_variables = free_variables,
                 .bound_variables = bound_variables
         };
@@ -253,7 +257,7 @@ void get_fv_application(struct CaptureParam param)
         get_fv_recursive(left_param);
 
         struct CaptureParam right_param = {
-                .lambda = lambda->application.right,
+                .lambda = lambda->right,
                 .free_variables = free_variables,
                 .bound_variables = bound_variables
         };
@@ -268,7 +272,7 @@ void get_fv_bind(struct CaptureParam param)
         Stack *bound_variables = param.bound_variables;
 
         struct CaptureParam bind_param = {
-                .lambda = lambda->bind.term,
+                .lambda = lambda->term,
                 .free_variables = free_variables,
                 .bound_variables = bound_variables
         };
