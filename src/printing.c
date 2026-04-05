@@ -66,7 +66,7 @@ void lambda_print(const Lambda *lambda, const Lambda *redex)
                 switch (top->type) {
                 case LAMBDA_ENTRY:
                         printf("%s", lambda->shortcut);
-                        stack_push(lambda_stack, top->term);
+                        stack_push(lambda_stack, top->expression);
                         stack_push(operator_stack, operator_table[OPERATOR_EQUALS]);
                         break;
 
@@ -83,11 +83,11 @@ void lambda_print(const Lambda *lambda, const Lambda *redex)
                         break;
                 
                 case LAMBDA_ABSTRACTION:
-                        variable = top->variable;
+                        struct Variable bind = top->bind;
                         
                         printf("%s", operator_table[OPERATOR_LAMBDA]);
 
-                        variable_print(variable);
+                        variable_print(bind);
 
                         stack_push(lambda_stack, top->body);
                         stack_push(operator_stack, operator_table[OPERATOR_DOT]);

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "parsing.h"
+#include "ast.h"
 
 typedef struct HashTable HashTable;
 

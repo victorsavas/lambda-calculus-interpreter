@@ -23,7 +23,7 @@ bool replace_shortcuts(Lambda *lambda, HashTable *table)
         while (top != NULL) {
                 switch (top->type) {
                 case LAMBDA_ENTRY:
-                        stack_push(stack, top->term);
+                        stack_push(stack, top->expression);
                         break;
 
                 case LAMBDA_SHORTCUT:
@@ -41,7 +41,7 @@ bool replace_shortcuts(Lambda *lambda, HashTable *table)
                                 goto error;
                         }
 
-                        Lambda *duplicate = lambda_duplicate(entry->term);
+                        Lambda *duplicate = lambda_duplicate(entry->expression);
 
                         if (duplicate == NULL) {
                                 printf(ANSI_RED "Error. Duplication fail.\n" ANSI_RESET);

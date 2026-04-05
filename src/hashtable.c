@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdio.h>
 
+#include "parser.h"
 #include "ansi_escapes.h"
 #include "printing.h"
 #include "hashtable.h"
@@ -211,7 +212,7 @@ void hashtable_print(HashTable *table)
                 printf(ANSI_BLUE "%-4ld " ANSI_RESET, i + 1);
                 
                 char *shortcut = array[i]->shortcut;
-                Lambda *term = array[i]->term;
+                Lambda *term = array[i]->expression;
 
                 printf("%-8s " ANSI_GREEN, shortcut);
 

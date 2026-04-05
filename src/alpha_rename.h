@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 
-#include "parsing.h"
+#include "ast.h"
 #include "stack.h"
 
 bool alpha_rename(Lambda *redex);

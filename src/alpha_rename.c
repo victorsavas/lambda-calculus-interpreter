@@ -72,7 +72,7 @@ bool capture_check(Lambda *redex, Stack *right_fv)
 
                 switch (top->type) {
                 case LAMBDA_ENTRY:
-                        stack_push(stack, top->term);
+                        stack_push(stack, top->expression);
                         break;
 
                 case LAMBDA_SHORTCUT:
@@ -82,9 +82,9 @@ bool capture_check(Lambda *redex, Stack *right_fv)
                         break;
 
                 case LAMBDA_ABSTRACTION:
-                        struct Variable *var = &top->variable;
+                        struct Variable *bind = &top->bind;
                         
-                        bool capture = stack_search(right_fv, var, variable_search);
+                        bool capture = stack_search(right_fv, bind, variable_search);
 
                         if (capture) {
                                 rename_abstraction(top, right_fv, binds);
@@ -93,7 +93,7 @@ bool capture_check(Lambda *redex, Stack *right_fv)
 
                         stack_push(stack, top->body);
                         push_height(height, h);
-                        stack_push(binds, var);
+                        stack_push(binds, bind);
 
                         break;
                         
@@ -124,7 +124,7 @@ void rename_abstraction(Lambda *abst, Stack *right_fv, Stack *binds)
          || abst->type != LAMBDA_ABSTRACTION)
                 return;
 
-        struct Variable *old_bind = &abst->variable;
+        struct Variable *old_bind = &abst->bind;
         Lambda *body = abst->body;
 
         Stack *stack = stack_init();
@@ -192,7 +192,7 @@ void rename_abstraction(Lambda *abst, Stack *right_fv, Stack *binds)
                 top = (Lambda *)stack_pop(stack);
         }
 
-        abst->variable = new_bind;
+        abst->bind = new_bind;
 
         stack_free(stack);
 }
@@ -236,11 +236,11 @@ Stack *get_inner_binds(Lambda *abst)
                         break;
 
                 case LAMBDA_ABSTRACTION:
-                        var = &top->variable;
+                        struct Variable *bind = &top->bind;
 
-                        if (!variable_compare(old_bind, *var)
-                         && !stack_search(inner_binds, var, variable_search))
-                                stack_push(inner_binds, var);
+                        if (!variable_compare(old_bind, *bind)
+                         && !stack_search(inner_binds, bind, variable_search))
+                                stack_push(inner_binds, bind);
 
                         break;
 
@@ -300,7 +300,7 @@ Stack *get_free_variables(Lambda *lambda)
 
                 switch (top->type) {
                 case LAMBDA_ENTRY:
-                        stack_push(stack, top->term);
+                        stack_push(stack, top->expression);
                         break;
 
                 case LAMBDA_SHORTCUT:
@@ -318,9 +318,11 @@ Stack *get_free_variables(Lambda *lambda)
                         break;
 
                 case LAMBDA_ABSTRACTION:
+                        struct Variable *bind = &top->bind;
+
                         stack_push(stack, top->body);
 
-                        stack_push(binds, &top->variable);
+                        stack_push(binds, bind);
                         push_height(height, h);
 
                         break;

@@ -35,9 +35,9 @@ Lambda *lambda_duplicate(const Lambda *lambda)
                         right = calloc(1, sizeof(*right));
 
                         dest_top->entry = my_strdup(src_top->entry);
-                        dest_top->term = right;
+                        dest_top->expression = right;
 
-                        stack_push(src_stack, src_top->term);
+                        stack_push(src_stack, src_top->expression);
                         stack_push(dest_stack, right);
 
                         break;
@@ -53,7 +53,7 @@ Lambda *lambda_duplicate(const Lambda *lambda)
                 case LAMBDA_ABSTRACTION:
                         right = calloc(1, sizeof(*right));
 
-                        dest_top->variable = src_top->variable;
+                        dest_top->bind = src_top->bind;
                         dest_top->body = right;
 
                         stack_push(src_stack, src_top->body);

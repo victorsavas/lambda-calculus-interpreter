@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "parsing.h"
+#include "parser.h"
 #include "hashtable.h"
 #include "printing.h"
 #include "shortcut.h"
@@ -19,7 +19,6 @@ struct Mode mode = {
         .interrupt = false,
         .reduction_enabled = false,
         .verbose = false,
-        .strat = STRAT_NORMAL,
         .depth = 1000
 };
 

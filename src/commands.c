@@ -13,7 +13,6 @@ static void command_help();
 static void command_reduce();
 static void command_remove(HashTable *table);
 
-static void reduce_s(struct Mode *new_mode, bool strat_parse);
 static void reduce_i(struct Mode *new_mode, bool steps_parse);
 static void reduce_v(struct Mode *new_mode, bool verbose_parse);
 static void reduce_enable(struct Mode *new_mode, char *token, bool enable_parse);
@@ -102,10 +101,6 @@ void command_help()
                 "To enable reduction, type \":reduce on\". Likewise, type \":reduce off\" to"
                 " disable it.\n"
                 "\n"
-                "This interpreter supports two reduction strategies:\n"
-                "  Normal order (:reduce -s normal)\n"
-                "  Applicative order (:reduce -s applicative)\n"
-                "\n"
                 "To specify recursion max depth, write \":reduce -i [DEPTH]. The default depth is 1000.\n"
                 "To print each reduction step, write \":reduce -v\".\n"
         );
@@ -113,7 +108,6 @@ void command_help()
 
 void command_reduce()
 {
-        bool strat_parse = false;
         bool steps_parse = false;
         bool verbose_parse = false;
         bool enable_parse = false;
@@ -123,8 +117,7 @@ void command_reduce()
 
         if (token == NULL) {
                 printf(
-                        ":reduce [-s ORDER] [-i STEPS] [-v] ENABLE\n"
-                        "ORDER: normal, applicative\n"
+                        ":reduce [-i STEPS] [-v] ENABLE\n"
                         "STEPS: <integer>\n"
                         "ENABLE: enabled, disabled\n"
                 );
@@ -136,10 +129,7 @@ void command_reduce()
         new_mode.verbose = false;
 
         while (token != NULL) {
-                if (strcmp(token, "-s") == 0) {
-                        reduce_s(&new_mode, strat_parse);
-                        strat_parse = true;
-                } else if (strcmp(token, "-i") == 0) {
+                if (strcmp(token, "-i") == 0) {
                         reduce_i(&new_mode, steps_parse);
                         steps_parse = true;
                 } else if (strcmp(token, "-v") == 0) {
@@ -176,60 +166,6 @@ void command_remove(HashTable *table)
                 printf("No \"%s\" entry found.\n", token);
 }
 
-void reduce_s(struct Mode *new_mode, bool strat_parse)
-{
-        if (strat_parse) {
-                printf(
-                        ANSI_RED
-                        "Error. Duplicate \"-s\" flag.\n"
-                        ANSI_RESET
-                );
-
-                new_mode->exit = true;
-                return;
-        }
-
-        const char *strat[] = {
-                "normal",
-                "applicative",
-        };
-
-        const RedStrat strat_code[] ={
-                STRAT_NORMAL,
-                STRAT_APPLICATIVE,
-        };
-
-        char *token = strtok(NULL, space);
-
-        if (token == NULL) {
-                printf(
-                        ANSI_RED
-                        "Syntax error. Expected argument after -s flag.\n"
-                        ANSI_RESET
-                        ":reduce -s [normal | applicative]\n"
-                );
-
-                new_mode->exit = true;
-                return;
-        }
-
-        for (int i = 0; i < 2; i++)
-                if (strcmp(token, strat[i]) == 0) {
-                        new_mode->strat = strat_code[i];
-                        return;
-                }
-
-        printf(
-                ANSI_RED
-                "Syntax error. Undefined reduction strategy \"-s %s\".\n"
-                ANSI_RESET
-                ":reduce -s [normal | applicative]\n",
-                token
-        );
-
-        new_mode->exit = true;
-}
-
 void reduce_i(struct Mode *new_mode, bool steps_parse)
 {
         if (steps_parse) {
@@ -250,7 +186,7 @@ void reduce_i(struct Mode *new_mode, bool steps_parse)
                         ANSI_RED
                         "Syntax error. Expected parameter.\n"
                         ANSI_RESET
-                        ":reduce -i [STEPS]\n"
+                        ":reduce -i [integer]\n"
                 );
 
                 new_mode->exit = true;
@@ -263,7 +199,7 @@ void reduce_i(struct Mode *new_mode, bool steps_parse)
                         "Syntax error. Invalid parameter \"%s\" (expected positive"
                         " integer value).\n"
                         ANSI_RESET
-                        ":reduce -i [STEPS]\n",
+                        ":reduce -i [integer]\n",
                         token
                 );
 
@@ -279,7 +215,7 @@ void reduce_i(struct Mode *new_mode, bool steps_parse)
                         "Syntax error. Reduction steps number \"steps\" must be "
                         "positive.\n"
                         ANSI_RESET
-                        ":reduce -i [STEPS]\n"
+                        ":reduce -i [integer]\n"
                 );
                 
                 new_mode->exit = true;
