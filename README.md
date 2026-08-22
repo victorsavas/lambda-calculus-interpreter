@@ -1,5 +1,5 @@
 # lambda-calculus
-An interpreter of the untyped lambda calculus written in the C Programming Language. The lambda calculus is a formal system for representing functions created by Alonzo Church during his studies into the foundations of mathematics. More on the lambda calculus and its theory on the [Stanford Encyclopedia of Philosophy](https://plato.stanford.edu/entries/lambda-calculus/).
+An interpreter of the untyped lambda calculus written in the C Programming Language. The lambda calculus is a formal system for representing functions created by Alonzo Church during his studies into the foundations of mathematics. More on the lambda calculus and its theory in the [Stanford Encyclopedia of Philosophy](https://plato.stanford.edu/entries/lambda-calculus/).
 
 ## Quick start
 
