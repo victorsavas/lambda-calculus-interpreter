@@ -20,3 +20,9 @@ To debug the program with the `-g` flag, use `BUILD_MODE=DEBUG`. Furthermore, to
 make BUILD_MODE=DEBUG ASAN=1
 ./lambda-calculus
 ```
+
+### Cleanup and recompile
+To manually clean up object files and recompile the project, use `make clean`.
+```bash
+make clean && make
+```
